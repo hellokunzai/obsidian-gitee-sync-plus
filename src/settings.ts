@@ -50,7 +50,7 @@ export class SyncSettingTab extends PluginSettingTab {
 		const l = messages();
 		const s = this.plugin.settings;
 		const save = () => this.plugin.savePluginData();
-		const managedFolders = await this.plugin.gitIgnoreManager.readManagedFolders();
+		const gitignoreContent = await this.plugin.gitIgnoreManager.readFullContent();
 
 		new Setting(containerEl)
 			.setName(l.settingsBackend)
@@ -174,11 +174,15 @@ export class SyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(l.settingsExcludeFolders)
 			.setDesc(l.settingsExcludeFoldersDesc)
-			.addText((t) =>
-				t.setValue(managedFolders).onChange(async (v) => {
-					await this.plugin.gitIgnoreManager.writeManagedFolders(v);
-				})
-			);
+			.addTextArea((t) => {
+				t.setValue(gitignoreContent);
+				t.inputEl.rows = 12;
+				t.inputEl.style.width = "100%";
+				t.inputEl.style.fontFamily = "monospace";
+				t.inputEl.addEventListener("blur", async () => {
+					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
+				});
+			});
 
 		new Setting(containerEl)
 			.setName(l.settingsDebugLog)

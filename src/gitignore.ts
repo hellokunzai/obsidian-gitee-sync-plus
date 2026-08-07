@@ -74,6 +74,21 @@ export class GitIgnoreManager {
 		return this.ig.ignores(path);
 	}
 
+	/** Reads the raw content of .gitignore from the vault root. */
+	async readFullContent(): Promise<string> {
+		const adapter = this.vault.adapter;
+		if (!(await adapter.exists(GITIGNORE_FILE))) {
+			return "";
+		}
+		return await adapter.read(GITIGNORE_FILE);
+	}
+
+	/** Overwrites .gitignore with the given raw content. */
+	async writeFullContent(content: string): Promise<void> {
+		const adapter = this.vault.adapter;
+		await adapter.write(GITIGNORE_FILE, content);
+	}
+
 	/**
 	 * Reads the plugin-managed exclusion list from .gitignore and returns it as a
 	 * comma-separated string for the settings UI.

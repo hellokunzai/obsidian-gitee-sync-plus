@@ -61,7 +61,7 @@ const en = {
 	settingsSyncOnStartDesc: "Run one sync after Obsidian starts.",
 	settingsExcludeFolders: "Excluded folders",
 	settingsExcludeFoldersDesc:
-		"Comma-separated folder prefixes written to the plugin-managed section of .gitignore. Sync respects the entire .gitignore file.",
+		"Raw contents of .gitignore at the vault root. Edit the rules here; they take effect on the next sync. Changes are saved when the field loses focus.",
 	settingsDebugLog: "Diagnostic log",
 	settingsDebugLogDesc:
 		"Record each sync plan and result in _gitee-sync-log.md at the vault root. The log should be excluded from sync via .gitignore.",
@@ -157,7 +157,7 @@ const zh: typeof en = {
 	settingsSyncOnStartDesc: "Obsidian 打开后自动执行一次同步。",
 	settingsExcludeFolders: "排除目录",
 	settingsExcludeFoldersDesc:
-		"逗号分隔的目录前缀，会写入 .gitignore 的插件管理区。同步时以整个 .gitignore 文件为准。",
+		"vault 根目录 .gitignore 的完整内容。在这里编辑规则，下次同步时生效。输入框失去焦点时自动保存。",
 	settingsDebugLog: "调试日志",
 	settingsDebugLogDesc:
 		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-log.md（建议通过 .gitignore 排除同步）。",
