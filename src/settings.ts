@@ -19,7 +19,8 @@ export interface SyncSettings {
 	/* common */
 	autoSyncMinutes: number;
 	syncOnStart: boolean;
-	excludeFolders: string;
+	/** @deprecated Migrated to the plugin-managed section of .gitignore. */
+	excludeFolders?: string;
 	debugLog: boolean;
 }
 
@@ -35,7 +36,6 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	githubToken: "",
 	autoSyncMinutes: 0,
 	syncOnStart: false,
-	excludeFolders: "",
 	debugLog: false,
 };
 
@@ -44,12 +44,13 @@ export class SyncSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	display(): void {
+	async display(): Promise<void> {
 		const { containerEl } = this;
 		containerEl.empty();
 		const l = messages();
 		const s = this.plugin.settings;
 		const save = () => this.plugin.savePluginData();
+		const managedFolders = await this.plugin.gitIgnoreManager.readManagedFolders();
 
 		new Setting(containerEl)
 			.setName(l.settingsBackend)
@@ -174,9 +175,8 @@ export class SyncSettingTab extends PluginSettingTab {
 			.setName(l.settingsExcludeFolders)
 			.setDesc(l.settingsExcludeFoldersDesc)
 			.addText((t) =>
-				t.setValue(s.excludeFolders).onChange(async (v) => {
-					s.excludeFolders = v;
-					await save();
+				t.setValue(managedFolders).onChange(async (v) => {
+					await this.plugin.gitIgnoreManager.writeManagedFolders(v);
 				})
 			);
 

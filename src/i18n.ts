@@ -61,10 +61,10 @@ const en = {
 	settingsSyncOnStartDesc: "Run one sync after Obsidian starts.",
 	settingsExcludeFolders: "Excluded folders",
 	settingsExcludeFoldersDesc:
-		"Comma-separated folder prefixes that will not be synced, for example: templates, attachments/cache",
+		"Comma-separated folder prefixes written to the plugin-managed section of .gitignore. Sync respects the entire .gitignore file.",
 	settingsDebugLog: "Diagnostic log",
 	settingsDebugLogDesc:
-		"Record each sync plan and result in _gitee-sync-log.md at the vault root. The log itself is excluded from sync.",
+		"Record each sync plan and result in _gitee-sync-log.md at the vault root. The log should be excluded from sync via .gitignore.",
 
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
@@ -156,10 +156,11 @@ const zh: typeof en = {
 	settingsSyncOnStart: "启动时同步",
 	settingsSyncOnStartDesc: "Obsidian 打开后自动执行一次同步。",
 	settingsExcludeFolders: "排除目录",
-	settingsExcludeFoldersDesc: "逗号分隔的目录前缀，这些目录不参与同步，例如：templates, attachments/cache",
+	settingsExcludeFoldersDesc:
+		"逗号分隔的目录前缀，会写入 .gitignore 的插件管理区。同步时以整个 .gitignore 文件为准。",
 	settingsDebugLog: "调试日志",
 	settingsDebugLogDesc:
-		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-log.md（该文件不参与同步）。",
+		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-log.md（建议通过 .gitignore 排除同步）。",
 
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",

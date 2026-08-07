@@ -1,4 +1,5 @@
 import { Notice, Plugin } from "obsidian";
+import { GitIgnoreManager } from "./gitignore";
 import { formatDateTime, formatTime, messages } from "./i18n";
 import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
 import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
@@ -25,6 +26,7 @@ export default class CloudSyncPlugin extends Plugin {
 	settings: SyncSettings = { ...DEFAULT_SETTINGS };
 	syncState: Record<string, string> = {};
 	hashCache: Record<string, HashCacheEntry> = {};
+	gitIgnoreManager!: GitIgnoreManager;
 
 	private statusBar!: HTMLElement;
 	private syncing = false;
@@ -33,6 +35,11 @@ export default class CloudSyncPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadPluginData();
 		const l = messages();
+
+		this.gitIgnoreManager = new GitIgnoreManager(this.app.vault);
+		await this.gitIgnoreManager.ensureExists();
+		await this.migrateLegacyExclusions();
+		await this.gitIgnoreManager.load();
 
 		this.addSettingTab(new SyncSettingTab(this.app, this));
 		this.statusBar = this.addStatusBarItem();
@@ -61,6 +68,16 @@ export default class CloudSyncPlugin extends Plugin {
 
 	onunload(): void {
 		this.clearAutoSync();
+	}
+
+	/** Migrates the legacy "Excluded folders" setting into .gitignore and clears it. */
+	private async migrateLegacyExclusions(): Promise<void> {
+		const legacy = this.settings.excludeFolders?.trim();
+		if (legacy) {
+			await this.gitIgnoreManager.writeManagedFolders(legacy);
+			this.settings.excludeFolders = "";
+			await this.savePluginData();
+		}
 	}
 
 	setupAutoSync(): void {

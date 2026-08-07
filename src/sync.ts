@@ -1,9 +1,9 @@
-import { TFile, Vault } from "obsidian";
+import { Vault } from "obsidian";
 import { createBackend, RemoteEntry, StorageBackend } from "./backend";
 import { formatDateTime, messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
 
-/** Diagnostic log note; excluded from sync so it never travels between devices. */
+/** Diagnostic log note. Excluded from sync via .gitignore so it never travels between devices. */
 export const LOG_FILE = "_gitee-sync-log.md";
 
 export interface SyncSummary {
@@ -15,7 +15,7 @@ export interface SyncSummary {
 }
 
 interface LocalEntry {
-	file: TFile;
+	path: string;
 	hash: string;
 	mtime: number;
 }
@@ -39,6 +39,10 @@ export interface SyncPlan {
  * at the last successful sync, so it can distinguish "changed here" from
  * "changed there" and propagate deletions in both directions.
  * When both sides changed the same file, the newer mtime wins.
+ *
+ * All file I/O goes through vault.adapter (not vault.* methods) so that
+ * hidden files and directories — which Obsidian does not index — can be
+ * synced correctly.  Exclusion is controlled entirely by .gitignore.
  */
 export class SyncEngine {
 	constructor(private plugin: CloudSyncPlugin) {}
@@ -47,21 +51,8 @@ export class SyncEngine {
 		return this.plugin.app.vault;
 	}
 
-	private excludedPrefixes(): string[] {
-		return this.plugin.settings.excludeFolders
-			.split(",")
-			.map((s) => s.trim().replace(/\/+$/, ""))
-			.filter((s) => s.length > 0)
-			.map((s) => s + "/");
-	}
-
 	private isExcluded(path: string): boolean {
-		if (path === LOG_FILE) return true;
-		// Hidden files/dirs (.obsidian, .git, ...) are invisible to Obsidian's
-		// index, so a remote copy would otherwise read as "new remote file"
-		// and clobber local config on pull. Ignore them on both sides.
-		if (path.split("/").some((seg) => seg.startsWith("."))) return true;
-		return this.excludedPrefixes().some((p) => path.startsWith(p));
+		return this.plugin.gitIgnoreManager.isIgnored(path);
 	}
 
 	/** Dry run: build and describe the plan without transferring anything. */
@@ -116,7 +107,7 @@ export class SyncEngine {
 			}
 			for (const { path, loc } of plan.localDeletes) {
 				await step(path, async () => {
-					await this.vault.trash(loc.file, true);
+					await this.vault.adapter.remove(loc.path);
 					delete this.plugin.hashCache[path];
 					summary.deletedLocal++;
 				});
@@ -126,7 +117,7 @@ export class SyncEngine {
 			// change surfaces as an API error instead of a silent overwrite).
 			for (const { path, loc, rem } of plan.pushes) {
 				await step(path, async () => {
-					const data = await this.vault.readBinary(loc.file);
+					const data = await this.vault.adapter.readBinary(loc.path);
 					await backend.upload(path, data, {
 						hash: loc.hash,
 						mtime: loc.mtime,
@@ -177,6 +168,7 @@ export class SyncEngine {
 	}
 
 	private async buildPlan(backend: StorageBackend): Promise<SyncPlan> {
+		await this.plugin.gitIgnoreManager.load();
 		const l = messages();
 		const [remoteList, local] = await Promise.all([
 			backend.manifest(),
@@ -326,34 +318,74 @@ export class SyncEngine {
 		}
 	}
 
+	/**
+	 * Recursively lists every file under `dir` (including hidden files/dirs)
+	 * using the low-level adapter, which bypasses Obsidian's file-index filter.
+	 *
+	 * On Windows the adapter may return entries as full vault-relative paths
+	 * (e.g. ".git\\hooks") rather than bare names.  We detect and handle both
+	 * forms to avoid path-doubling bugs like ".git/.git/hooks".
+	 */
+	private async listAllFiles(dir: string): Promise<string[]> {
+		const result: string[] = [];
+		const listing = await this.vault.adapter.list(dir);
+
+		const dirNorm = dir.replace(/\\/g, "/");
+		const joinPath = (name: string): string => {
+			const norm = name.replace(/\\/g, "/");
+			// adapter already returned a full vault-relative path
+			if (dirNorm && (norm === dirNorm || norm.startsWith(dirNorm + "/"))) {
+				return norm;
+			}
+			return dirNorm ? `${dirNorm}/${norm}` : norm;
+		};
+
+		for (const file of listing.files) {
+			result.push(joinPath(file));
+		}
+		for (const folder of listing.folders) {
+			const subDir = joinPath(folder);
+			// Early skip: don't recurse into excluded directories
+			if (this.isExcluded(subDir) || this.isExcluded(subDir + "/")) continue;
+			const subFiles = await this.listAllFiles(subDir);
+			result.push(...subFiles);
+		}
+		return result;
+	}
+
 	/** Builds { path -> hash } for the vault, reusing cached hashes when mtime+size are unchanged. */
 	private async buildLocalManifest(backend: StorageBackend): Promise<Map<string, LocalEntry>> {
 		const result = new Map<string, LocalEntry>();
 		const cache = this.plugin.hashCache;
 		const seen = new Set<string>();
+		const adapter = this.vault.adapter;
 
-		for (const file of this.vault.getFiles()) {
-			if (this.isExcluded(file.path)) continue;
-			seen.add(file.path);
-			const cached = cache[file.path];
+		const allFiles = await this.listAllFiles("");
+
+		for (const path of allFiles) {
+			if (this.isExcluded(path)) continue;
+			seen.add(path);
+			const stat = await adapter.stat(path);
+			if (!stat || stat.type !== "file") continue;
+			const cached = cache[path];
 			let hash: string;
 			if (
 				cached &&
 				cached.algo === backend.id &&
-				cached.mtime === file.stat.mtime &&
-				cached.size === file.stat.size
+				cached.mtime === stat.mtime &&
+				cached.size === stat.size
 			) {
 				hash = cached.hash;
 			} else {
-				hash = await backend.hashData(await this.vault.readBinary(file));
-				cache[file.path] = {
-					mtime: file.stat.mtime,
-					size: file.stat.size,
+				hash = await backend.hashData(await adapter.readBinary(path));
+				cache[path] = {
+					mtime: stat.mtime,
+					size: stat.size,
 					hash,
 					algo: backend.id,
 				};
 			}
-			result.set(file.path, { file, hash, mtime: file.stat.mtime });
+			result.set(path, { path, hash, mtime: stat.mtime });
 		}
 
 		for (const path of Object.keys(cache)) {
@@ -366,15 +398,9 @@ export class SyncEngine {
 	private async writeLocal(path: string, data: ArrayBuffer, mtime: number): Promise<number> {
 		const dir = path.split("/").slice(0, -1).join("/");
 		if (dir) await this.ensureFolder(dir);
-		const existing = this.vault.getAbstractFileByPath(path);
-		const options = mtime > 0 ? { mtime } : undefined;
-		if (existing instanceof TFile) {
-			await this.vault.modifyBinary(existing, data, options);
-		} else {
-			await this.vault.createBinary(path, data, options);
-		}
-		const written = this.vault.getAbstractFileByPath(path);
-		return written instanceof TFile ? written.stat.mtime : mtime;
+		await this.vault.adapter.writeBinary(path, data);
+		const stat = await this.vault.adapter.stat(path);
+		return stat ? stat.mtime : mtime;
 	}
 
 	private async ensureFolder(dir: string): Promise<void> {
@@ -382,9 +408,9 @@ export class SyncEngine {
 		let current = "";
 		for (const part of parts) {
 			current = current ? `${current}/${part}` : part;
-			if (!this.vault.getAbstractFileByPath(current)) {
+			if (!(await this.vault.adapter.exists(current))) {
 				try {
-					await this.vault.createFolder(current);
+					await this.vault.adapter.mkdir(current);
 				} catch {
 					// Folder may have been created concurrently; ignore.
 				}
