@@ -175,7 +175,7 @@ export class GitHostBackend implements StorageBackend {
 		}
 	}
 
-	hashData(data: ArrayBuffer): Promise<string> {
+hashData(data: ArrayBuffer): Promise<string> {
 		return gitBlobSha1(data);
 	}
 
@@ -190,6 +190,50 @@ export class GitHostBackend implements StorageBackend {
 		const date = commits[0]?.commit?.committer?.date;
 		return date ? Date.parse(date) : 0;
 	}
+}
+
+/** Fetch branch list from a Gitee or GitHub repository. */
+export async function fetchBranches(
+	host: GitHost,
+	owner: string,
+	repo: string,
+	token: string
+): Promise<string[]> {
+	const ownerEnc = encodeURIComponent(owner);
+	const repoEnc = encodeURIComponent(repo);
+	const urlBase =
+		host === "github"
+			? `https://api.github.com/repos/${ownerEnc}/${repoEnc}`
+			: `https://gitee.com/api/v5/repos/${ownerEnc}/${repoEnc}`;
+	const isGithub = host === "github";
+	const sep = urlBase.includes("?") ? "&" : "?";
+	const url = isGithub
+		? `${urlBase}/branches?per_page=100`
+		: `${urlBase}/branches${sep}access_token=${encodeURIComponent(token)}`;
+	const resp = await requestUrl({
+		url,
+		method: "GET",
+		throw: false,
+		headers: isGithub
+			? {
+					Authorization: `Bearer ${token}`,
+					Accept: "application/vnd.github+json",
+					"X-GitHub-Api-Version": "2022-11-28",
+			  }
+			: {},
+	});
+	if (resp.status >= 400) {
+		const l = messages();
+		let detail = "";
+		try {
+			detail = (resp.json as { message?: string }).message ?? "";
+		} catch {
+			detail = resp.text.slice(0, 200);
+		}
+		throw new GitHostError(resp.status, l.apiFailed(host, "GET", resp.status, detail));
+	}
+	const branches = resp.json as { name: string }[];
+	return branches.map((b) => b.name);
 }
 
 class GitHostError extends Error {

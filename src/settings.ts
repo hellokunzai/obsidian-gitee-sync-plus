@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
+import { fetchBranches } from "./githost";
 
 export type BackendType = "gitee" | "github";
 
@@ -69,12 +70,25 @@ export class SyncSettingTab extends PluginSettingTab {
 
 		if (s.backend === "gitee") {
 			new Setting(containerEl)
+				.setName(l.settingsGiteeToken)
+				.setDesc(l.settingsGiteeTokenDesc)
+				.addText((t) => {
+					t.inputEl.type = "password";
+					t.setValue(s.giteeToken).onChange(async (v) => {
+						s.giteeToken = v.trim();
+						await save();
+						this.display();
+					});
+				});
+
+			new Setting(containerEl)
 				.setName(l.settingsGiteeOwner)
 				.setDesc(l.settingsOwnerDesc)
 				.addText((t) =>
 					t.setPlaceholder("your-name").setValue(s.giteeOwner).onChange(async (v) => {
 						s.giteeOwner = v.trim();
 						await save();
+						this.display();
 					})
 				);
 
@@ -85,29 +99,34 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("obsidian-vault").setValue(s.giteeRepo).onChange(async (v) => {
 						s.giteeRepo = v.trim();
 						await save();
+						this.display();
 					})
 				);
 
+			await this.renderBranchSetting(
+				containerEl,
+				"gitee",
+				s.giteeOwner,
+				s.giteeRepo,
+				s.giteeToken,
+				s.giteeBranch,
+				(v) => {
+					s.giteeBranch = v;
+				}
+			);
+		} else {
 			new Setting(containerEl)
-				.setName(l.settingsBranch)
-				.addText((t) =>
-					t.setPlaceholder("master").setValue(s.giteeBranch).onChange(async (v) => {
-						s.giteeBranch = v.trim() || "master";
-						await save();
-					})
-				);
-
-			new Setting(containerEl)
-				.setName(l.settingsGiteeToken)
-				.setDesc(l.settingsGiteeTokenDesc)
+				.setName(l.settingsGithubToken)
+				.setDesc(l.settingsGithubTokenDesc)
 				.addText((t) => {
 					t.inputEl.type = "password";
-					t.setValue(s.giteeToken).onChange(async (v) => {
-						s.giteeToken = v.trim();
+					t.setValue(s.githubToken).onChange(async (v) => {
+						s.githubToken = v.trim();
 						await save();
+						this.display();
 					});
 				});
-		} else {
+
 			new Setting(containerEl)
 				.setName(l.settingsGithubOwner)
 				.setDesc(l.settingsOwnerDesc)
@@ -115,6 +134,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("your-name").setValue(s.githubOwner).onChange(async (v) => {
 						s.githubOwner = v.trim();
 						await save();
+						this.display();
 					})
 				);
 
@@ -125,28 +145,21 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("obsidian-vault").setValue(s.githubRepo).onChange(async (v) => {
 						s.githubRepo = v.trim();
 						await save();
+						this.display();
 					})
 				);
 
-			new Setting(containerEl)
-				.setName(l.settingsBranch)
-				.addText((t) =>
-					t.setPlaceholder("main").setValue(s.githubBranch).onChange(async (v) => {
-						s.githubBranch = v.trim() || "main";
-						await save();
-					})
-				);
-
-			new Setting(containerEl)
-				.setName(l.settingsGithubToken)
-				.setDesc(l.settingsGithubTokenDesc)
-				.addText((t) => {
-					t.inputEl.type = "password";
-					t.setValue(s.githubToken).onChange(async (v) => {
-						s.githubToken = v.trim();
-						await save();
-					});
-				});
+			await this.renderBranchSetting(
+				containerEl,
+				"github",
+				s.githubOwner,
+				s.githubRepo,
+				s.githubToken,
+				s.githubBranch,
+				(v) => {
+					s.githubBranch = v;
+				}
+			);
 		}
 
 		new Setting(containerEl)
@@ -193,5 +206,71 @@ export class SyncSettingTab extends PluginSettingTab {
 					await save();
 				})
 			);
+	}
+
+	private async renderBranchSetting(
+		containerEl: HTMLElement,
+		host: "gitee" | "github",
+		owner: string,
+		repo: string,
+		token: string,
+		currentBranch: string,
+		setBranch: (v: string) => void
+	): Promise<void> {
+		const l = messages();
+		const save = () => this.plugin.savePluginData();
+		const setting = new Setting(containerEl).setName(l.settingsBranch);
+		const defaultBranch = host === "github" ? "main" : "master";
+		const value = currentBranch || defaultBranch;
+
+		const renderDisabled = (desc?: string) => {
+			setting.addDropdown((d) => {
+				d.addOption(value, value);
+				d.setValue(value);
+				d.selectEl.disabled = true;
+				d.onChange(async (v) => {
+					setBranch(v);
+					await save();
+				});
+			});
+			setting.addButton((b) =>
+				b
+					.setIcon("refresh-cw")
+					.setTooltip(l.refreshBranches)
+					.onClick(() => this.display())
+			);
+			if (desc) setting.setDesc(desc);
+		};
+
+		if (owner && repo && token) {
+			try {
+				const branches = await fetchBranches(host, owner, repo, token);
+				if (branches.length === 0) {
+					throw new Error("No branches");
+				}
+				setting.addDropdown((d) => {
+					for (const b of branches) {
+						d.addOption(b, b);
+					}
+					d.setValue(value);
+					d.onChange(async (v) => {
+						setBranch(v);
+						await save();
+					});
+				});
+				setting.addButton((b) =>
+					b
+						.setIcon("refresh-cw")
+						.setTooltip(l.refreshBranches)
+						.onClick(() => this.display())
+				);
+				return;
+			} catch {
+				renderDisabled(l.settingsBranchLoadFailed);
+				return;
+			}
+		}
+
+		renderDisabled(l.settingsBranchNeedInfo);
 	}
 }
