@@ -321,7 +321,6 @@ export class GitPanelView extends ItemView {
 		}
 		for (const item of items) {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
-			row.setAttr("title", l.panelClickToDiff);
 
 			row.createSpan({
 				text: item.tag,
@@ -361,7 +360,15 @@ export class GitPanelView extends ItemView {
 					this.onDiscard(item.path);
 				});
 			}
-			row.addEventListener("click", () => void this.openDiff(item));
+			const viewBtn = row.createEl("button", {
+				text: "👁",
+				cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
+				title: l.panelViewDiff,
+			});
+			viewBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.openDiff(item);
+			});
 		}
 	}
 

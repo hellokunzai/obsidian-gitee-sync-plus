@@ -147,6 +147,7 @@ const en = {
 	panelStageAllHint: "Stage all local changes",
 	panelUnstageAllHint: "Unstage all changes",
 	panelNothingStaged: "No staged changes to commit",
+	panelViewDiff: "View diff",
 
 	diffTitle: "Diff",
 	diffTitleFor: (path: string) => `Diff: ${path}`,
@@ -311,6 +312,7 @@ const zh: typeof en = {
 	panelStageAllHint: "暂存所有本地更改",
 	panelUnstageAllHint: "取消暂存所有更改",
 	panelNothingStaged: "没有已暂存的更改可提交",
+	panelViewDiff: "查看差异",
 
 	diffTitle: "差异对比",
 	diffTitleFor: (path) => `差异：${path}`,
