@@ -3,6 +3,37 @@ import { messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
 import { fetchBranches } from "./githost";
 
+interface BranchCache {
+	branches: string[];
+	timestamp: number;
+}
+
+const branchCache = new Map<string, BranchCache>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(host: string, owner: string, repo: string): string {
+	return `${host}:${owner}/${repo}`;
+}
+
+function getCachedBranches(host: string, owner: string, repo: string): string[] | null {
+	const key = getCacheKey(host, owner, repo);
+	const cached = branchCache.get(key);
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+		return cached.branches;
+	}
+	return null;
+}
+
+function setCachedBranches(host: string, owner: string, repo: string, branches: string[]): void {
+	const key = getCacheKey(host, owner, repo);
+	branchCache.set(key, { branches, timestamp: Date.now() });
+}
+
+function clearBranchCache(host: string, owner: string, repo: string): void {
+	const key = getCacheKey(host, owner, repo);
+	branchCache.delete(key);
+}
+
 export type BackendType = "gitee" | "github";
 
 export interface SyncSettings {
@@ -223,54 +254,76 @@ export class SyncSettingTab extends PluginSettingTab {
 		const defaultBranch = host === "github" ? "main" : "master";
 		const value = currentBranch || defaultBranch;
 
-		const renderDisabled = (desc?: string) => {
-			setting.addDropdown((d) => {
-				d.addOption(value, value);
-				d.setValue(value);
-				d.selectEl.disabled = true;
-				d.onChange(async (v) => {
-					setBranch(v);
-					await save();
-				});
+		// 先渲染下拉框（可能为空或只有当前值）
+		let dropdownComponent: any;
+		let isLoading = false;
+
+		setting.addDropdown((d) => {
+			dropdownComponent = d;
+			d.addOption(value, value);
+			d.setValue(value);
+			d.onChange(async (v) => {
+				setBranch(v);
+				await save();
 			});
-			setting.addButton((b) =>
-				b
-					.setIcon("refresh-cw")
-					.setTooltip(l.refreshBranches)
-					.onClick(() => this.display())
-			);
-			if (desc) setting.setDesc(desc);
-		};
+		});
 
-		if (owner && repo && token) {
-			try {
-				const branches = await fetchBranches(host, owner, repo, token);
-				if (branches.length === 0) {
-					throw new Error("No branches");
-				}
-				setting.addDropdown((d) => {
-					for (const b of branches) {
-						d.addOption(b, b);
+		setting.addButton((b) =>
+			b
+				.setIcon("refresh-cw")
+				.setTooltip(l.refreshBranches)
+				.onClick(async () => {
+					if (isLoading || !owner || !repo || !token) return;
+					isLoading = true;
+					b.setDisabled(true);
+					try {
+						clearBranchCache(host, owner, repo);
+						const branches = await fetchBranches(host, owner, repo, token);
+						setCachedBranches(host, owner, repo, branches);
+						// 清空并重新填充选项
+						dropdownComponent.selectEl.innerHTML = "";
+						for (const branch of branches) {
+							dropdownComponent.addOption(branch, branch);
+						}
+						// 保留当前选择，如果存在的话
+						const currentVal = dropdownComponent.getValue() as string;
+						if (branches.includes(currentVal)) {
+							dropdownComponent.setValue(currentVal);
+						} else if (branches.length > 0) {
+							dropdownComponent.setValue(branches[0]);
+							setBranch(branches[0]);
+							await save();
+						}
+						setting.setDesc("");
+					} catch (err: any) {
+						setting.setDesc(l.settingsBranchLoadFailed);
+					} finally {
+						isLoading = false;
+						b.setDisabled(false);
 					}
-					d.setValue(value);
-					d.onChange(async (v) => {
-						setBranch(v);
-						await save();
-					});
-				});
-				setting.addButton((b) =>
-					b
-						.setIcon("refresh-cw")
-						.setTooltip(l.refreshBranches)
-						.onClick(() => this.display())
-				);
-				return;
-			} catch {
-				renderDisabled(l.settingsBranchLoadFailed);
-				return;
-			}
-		}
+				})
+		);
 
-		renderDisabled(l.settingsBranchNeedInfo);
+		// 如果信息齐全，尝试从缓存加载或静默预加载
+		if (owner && repo && token) {
+			const cached = getCachedBranches(host, owner, repo);
+			if (cached) {
+				// 有缓存，直接填充
+				dropdownComponent.selectEl.innerHTML = "";
+				for (const branch of cached) {
+					dropdownComponent.addOption(branch, branch);
+				}
+				if (cached.includes(value)) {
+					dropdownComponent.setValue(value);
+				} else if (cached.length > 0) {
+					dropdownComponent.setValue(cached[0]);
+					setBranch(cached[0]);
+					await save();
+				}
+			}
+			// 无缓存时不自动加载，等用户点击刷新按钮
+		} else {
+			setting.setDesc(l.settingsBranchNeedInfo);
+		}
 	}
 }
