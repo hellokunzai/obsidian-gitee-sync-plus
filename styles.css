@@ -63,6 +63,11 @@
 	font-weight: 600;
 	color: var(--text-muted);
 }
+.gitee-sync-plus-panel-group-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
 .gitee-sync-plus-panel-group-empty {
 	font-size: 0.78em;
 	color: var(--text-faint);
@@ -77,6 +82,11 @@
 }
 .gitee-sync-plus-panel-item:hover {
 	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-panel-checkbox {
+	flex: 0 0 auto;
+	margin: 0;
+	cursor: pointer;
 }
 .gitee-sync-plus-panel-item-status {
 	flex: 0 0 auto;

@@ -81,7 +81,7 @@ export class SyncEngine {
 
 		try {
 			await this.executePull(backend, plan, nextState, summary);
-			await this.executePush(backend, plan, nextState, summary, message);
+			await this.executePush(backend, plan, nextState, summary, { message });
 		} catch (e) {
 			// Persist what already succeeded so a re-run doesn't redo it.
 			this.plugin.syncState = nextState;
@@ -145,9 +145,13 @@ export class SyncEngine {
 		return summary;
 	}
 
-	/** Phase 2 only: push local changes (and remote deletions). When commitMode
-	 * is "batch", `message` overrides the auto-generated batch commit message. */
-	async pushLocal(message?: string): Promise<SyncSummary> {
+	/**
+	 * Phase 2 only: push local changes (and remote deletions). When commitMode
+	 * is "batch", `message` overrides the auto-generated batch commit message.
+	 * If `staged` is provided, only the local-change paths in that set are sent;
+	 * the rest remain in the working tree for a later commit.
+	 */
+	async pushLocal(message?: string, staged?: Set<string>): Promise<SyncSummary> {
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
 		const summary: SyncSummary = {
@@ -159,7 +163,7 @@ export class SyncEngine {
 		};
 		const nextState = { ...plan.nextState };
 		try {
-			await this.executePush(backend, plan, nextState, summary, message);
+			await this.executePush(backend, plan, nextState, summary, { message, staged });
 		} catch (e) {
 			this.plugin.syncState = nextState;
 			await this.plugin.savePluginData();
@@ -257,9 +261,10 @@ export class SyncEngine {
 		plan: SyncPlan,
 		nextState: Record<string, string>,
 		summary: SyncSummary,
-		message?: string
+		opts: { message?: string; staged?: Set<string> } = {}
 	): Promise<void> {
 		const l = messages();
+		const { message, staged } = opts;
 		const step = async (path: string, fn: () => Promise<void>) => {
 			try {
 				await fn();
@@ -269,15 +274,19 @@ export class SyncEngine {
 			}
 		};
 
+		const isStaged = (path: string) => !staged || staged.has(path);
+		const stagedPushes = plan.pushes.filter((p) => isStaged(p.path));
+		const stagedDeletes = plan.remoteDeletes.filter((d) => isStaged(d.path));
+
 		// Phase 2: send local changes out.
 		if (this.plugin.settings.commitMode === "batch" && backend.batchCommit) {
-			// Batch mode: all pushes and remote deletes in a single commit.
+			// Batch mode: all staged pushes and remote deletes in a single commit.
 			const batchFiles: BatchFileChange[] = [];
-			for (const { path, loc, rem } of plan.pushes) {
+			for (const { path, loc, rem } of stagedPushes) {
 				const data = await this.vault.adapter.readBinary(loc.path);
 				batchFiles.push({ path, data, remoteHash: rem?.hash });
 			}
-			const batchDeletes: BatchDelete[] = plan.remoteDeletes.map(({ path, rem }) => ({
+			const batchDeletes: BatchDelete[] = stagedDeletes.map(({ path, rem }) => ({
 				path,
 				remoteHash: rem.hash,
 			}));
@@ -291,17 +300,17 @@ export class SyncEngine {
 					);
 				}
 			}
-			for (const { path, loc } of plan.pushes) {
+			for (const { path, loc } of stagedPushes) {
 				nextState[path] = loc.hash;
 				summary.pushed++;
 			}
-			for (const { path } of plan.remoteDeletes) {
+			for (const { path } of stagedDeletes) {
 				summary.deletedRemote++;
 			}
 		} else {
 			// Per-file mode: sha-guarded, so a concurrent remote change surfaces
 			// as an API error instead of a silent overwrite.
-			for (const { path, loc, rem } of plan.pushes) {
+			for (const { path, loc, rem } of stagedPushes) {
 				await step(path, async () => {
 					const data = await this.vault.adapter.readBinary(loc.path);
 					await backend.upload(path, data, {
@@ -313,7 +322,7 @@ export class SyncEngine {
 					summary.pushed++;
 				});
 			}
-			for (const { path, rem } of plan.remoteDeletes) {
+			for (const { path, rem } of stagedDeletes) {
 				await step(path, async () => {
 					await backend.remove(path, rem.hash);
 					summary.deletedRemote++;

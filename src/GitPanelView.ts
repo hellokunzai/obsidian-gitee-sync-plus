@@ -2,6 +2,7 @@ import { App, ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { messages } from "./i18n";
 import { SyncEngine, SyncPlan } from "./sync";
+import type { RemoteEntry } from "./backend";
 import { DiffKind, openDiffView } from "./DiffView";
 
 export const GIT_PANEL_VIEW_TYPE = "gitee-sync-plus-git-panel";
@@ -69,6 +70,8 @@ export class GitPanelView extends ItemView {
 	private statusEl!: HTMLElement;
 	private busy = false;
 	private refreshTimer: number | null = null;
+	/** Paths selected for the next commit. Reset when a commit succeeds. */
+	private staged = new Set<string>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: CloudSyncPlugin) {
 		super(leaf);
@@ -196,21 +199,42 @@ export class GitPanelView extends ItemView {
 		this.listEl.empty();
 		if (!p) return;
 
-		const localItems: PanelItem[] = [
-			...p.pushes.map((x) => ({
-				path: x.path,
-				tag: x.rem ? l.statusTagModified : l.statusTagAdded,
-				kind: (x.rem ? "mod" : "add") as ItemKind,
-				discardable: true,
-				group: "local" as const,
-			})),
-			...p.localDeletes.map((x) => ({
-				path: x.path,
-				tag: l.statusTagDeleted,
-				kind: "del" as ItemKind,
-				discardable: false,
-				group: "local" as const,
-			})),
+		// Remove staged paths that no longer appear in the current plan.
+		const localChangePaths = new Set<string>([
+			...p.pushes.map((x) => x.path),
+			...p.remoteDeletes.map((x) => x.path),
+		]);
+		for (const path of this.staged) {
+			if (!localChangePaths.has(path)) this.staged.delete(path);
+		}
+
+		const makeLocalItem = (
+			x: { path: string; rem?: RemoteEntry },
+			kind: ItemKind,
+			tag: string
+		): PanelItem => ({
+			path: x.path,
+			tag,
+			kind,
+			discardable: true,
+			group: "local" as const,
+		});
+
+		const unstagedItems: PanelItem[] = [
+			...p.pushes
+				.filter((x) => !this.staged.has(x.path))
+				.map((x) => makeLocalItem(x, x.rem ? "mod" : "add", x.rem ? l.statusTagModified : l.statusTagAdded)),
+			...p.remoteDeletes
+				.filter((x) => !this.staged.has(x.path))
+				.map((x) => makeLocalItem(x, "del", l.statusTagDeleted)),
+		];
+		const stagedItems: PanelItem[] = [
+			...p.pushes
+				.filter((x) => this.staged.has(x.path))
+				.map((x) => makeLocalItem(x, x.rem ? "mod" : "add", x.rem ? l.statusTagModified : l.statusTagAdded)),
+			...p.remoteDeletes
+				.filter((x) => this.staged.has(x.path))
+				.map((x) => makeLocalItem(x, "del", l.statusTagDeleted)),
 		];
 		const remoteItems: PanelItem[] = [
 			...p.pulls.map((x) => ({
@@ -220,7 +244,7 @@ export class GitPanelView extends ItemView {
 				discardable: false,
 				group: "remote" as const,
 			})),
-			...p.remoteDeletes.map((x) => ({
+			...p.localDeletes.map((x) => ({
 				path: x.path,
 				tag: l.statusTagDeleted,
 				kind: "del" as ItemKind,
@@ -229,16 +253,32 @@ export class GitPanelView extends ItemView {
 			})),
 		];
 
-		if (localItems.length === 0 && remoteItems.length === 0) {
+		if (stagedItems.length === 0 && unstagedItems.length === 0 && remoteItems.length === 0) {
 			this.listEl.createDiv({ text: l.panelNoChanges, cls: "gitee-sync-plus-panel-empty" });
 			return;
 		}
 
-		this.renderGroup(l.panelGroupLocal, localItems, () => this.onDiscardAll());
-		this.renderGroup(l.panelGroupRemote, remoteItems);
+		if (stagedItems.length > 0) {
+			this.renderGroup(l.panelGroupStaged, stagedItems, {
+				unstageAll: () => this.onUnstageAll(),
+			});
+		}
+		if (unstagedItems.length > 0) {
+			this.renderGroup(l.panelGroupUnstaged, unstagedItems, {
+				stageAll: () => this.onStageAll(),
+				discardAll: () => this.onDiscardAll(),
+			});
+		}
+		if (remoteItems.length > 0) {
+			this.renderGroup(l.panelGroupRemote, remoteItems);
+		}
 	}
 
-	private renderGroup(title: string, items: PanelItem[], action?: () => void): void {
+	private renderGroup(
+		title: string,
+		items: PanelItem[],
+		actions?: { stageAll?: () => void; unstageAll?: () => void; discardAll?: () => void }
+	): void {
 		const l = messages();
 		const group = this.listEl.createDiv("gitee-sync-plus-panel-group");
 		const header = group.createDiv("gitee-sync-plus-panel-group-header");
@@ -246,13 +286,29 @@ export class GitPanelView extends ItemView {
 			text: `${title} (${items.length})`,
 			cls: "gitee-sync-plus-panel-group-title",
 		});
-		if (action) {
-			header
-				.createEl("button", {
-					text: l.panelDiscardAll,
-					cls: "gitee-sync-plus-panel-mini-btn",
-				})
-				.addEventListener("click", action);
+		const headerBtns = header.createDiv("gitee-sync-plus-panel-group-actions");
+		if (actions?.stageAll) {
+			const btn = headerBtns.createEl("button", {
+				text: l.panelStageAll,
+				cls: "gitee-sync-plus-panel-mini-btn",
+				title: l.panelStageAllHint,
+			});
+			btn.addEventListener("click", actions.stageAll);
+		}
+		if (actions?.unstageAll) {
+			const btn = headerBtns.createEl("button", {
+				text: l.panelUnstageAll,
+				cls: "gitee-sync-plus-panel-mini-btn",
+				title: l.panelUnstageAllHint,
+			});
+			btn.addEventListener("click", actions.unstageAll);
+		}
+		if (actions?.discardAll) {
+			const btn = headerBtns.createEl("button", {
+				text: l.panelDiscardAll,
+				cls: "gitee-sync-plus-panel-mini-btn",
+			});
+			btn.addEventListener("click", actions.discardAll);
 		}
 		if (items.length === 0) {
 			group.createDiv({
@@ -264,6 +320,19 @@ export class GitPanelView extends ItemView {
 		for (const item of items) {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
 			row.setAttr("title", l.panelClickToDiff);
+
+			const staged = this.staged.has(item.path);
+			const checkbox = row.createEl("input", {
+				type: "checkbox",
+				cls: "gitee-sync-plus-panel-checkbox",
+			});
+			checkbox.checked = staged;
+			checkbox.title = staged ? l.panelUnstage : l.panelStage;
+			checkbox.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.toggleStage(item.path, checkbox.checked);
+			});
+
 			row.createSpan({
 				text: item.tag,
 				cls: `gitee-sync-plus-panel-item-status s-${item.kind}`,
@@ -307,11 +376,33 @@ export class GitPanelView extends ItemView {
 
 	private onDiscardAll(): void {
 		const l = messages();
-		const paths = this.plan ? this.plan.pushes.map((x) => x.path) : [];
+		if (!this.plan) return;
+		const paths = [
+			...this.plan.pushes.filter((x) => !this.staged.has(x.path)).map((x) => x.path),
+			...this.plan.remoteDeletes.filter((x) => !this.staged.has(x.path)).map((x) => x.path),
+		];
 		if (paths.length === 0) return;
 		new DiscardConfirmModal(this.app, l.panelDiscardAllConfirm(paths.length), () =>
 			void this.doDiscard(paths)
 		).open();
+	}
+
+	private toggleStage(path: string, checked: boolean): void {
+		if (checked) this.staged.add(path);
+		else this.staged.delete(path);
+		this.renderList();
+	}
+
+	private onStageAll(): void {
+		if (!this.plan) return;
+		for (const p of this.plan.pushes) this.staged.add(p.path);
+		for (const d of this.plan.remoteDeletes) this.staged.add(d.path);
+		this.renderList();
+	}
+
+	private onUnstageAll(): void {
+		this.staged.clear();
+		this.renderList();
 	}
 
 	private async doDiscard(paths: string[]): Promise<void> {
@@ -336,7 +427,13 @@ export class GitPanelView extends ItemView {
 		this.setStatus(l.panelStatusWorking);
 		try {
 			const msg = this.messageEl.value.trim() || undefined;
-			const summary = await this.engine.pushLocal(msg);
+			if (this.staged.size === 0) {
+				new Notice(l.panelNothingStaged, 4000);
+				return;
+			}
+			const summary = await this.engine.pushLocal(msg, new Set(this.staged));
+			this.staged.clear();
+			this.messageEl.value = "";
 			this.plugin.announceSummary(summary);
 			await this.refresh();
 		} catch (e) {
