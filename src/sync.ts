@@ -317,6 +317,7 @@ export class SyncEngine {
 						hash: loc.hash,
 						mtime: loc.mtime,
 						remoteHash: rem?.hash,
+						message,
 					});
 					nextState[path] = loc.hash;
 					summary.pushed++;

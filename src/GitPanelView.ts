@@ -435,7 +435,6 @@ export class GitPanelView extends ItemView {
 			this.staged.clear();
 			this.messageEl.value = "";
 			this.plugin.announceSummary(summary);
-			await this.refresh();
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			this.setStatus(l.panelStatusError(msg));
@@ -443,6 +442,10 @@ export class GitPanelView extends ItemView {
 		} finally {
 			this.busy = false;
 		}
+		// Refresh AFTER releasing the busy flag — otherwise refresh()'s
+		// `if (this.busy) return` guard would skip the repaint and the staged
+		// list would visually look like it was never cleared.
+		await this.refresh();
 	}
 
 	private async onPull(): Promise<void> {
@@ -453,7 +456,6 @@ export class GitPanelView extends ItemView {
 		try {
 			const summary = await this.engine.pullRemote();
 			this.plugin.announceSummary(summary);
-			await this.refresh();
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			this.setStatus(l.panelStatusError(msg));
@@ -461,5 +463,7 @@ export class GitPanelView extends ItemView {
 		} finally {
 			this.busy = false;
 		}
+		// Refresh AFTER releasing the busy flag (same guard issue as onCommit).
+		await this.refresh();
 	}
 }

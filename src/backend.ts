@@ -38,7 +38,7 @@ export interface StorageBackend {
 	upload(
 		path: string,
 		data: ArrayBuffer,
-		opts: { hash: string; mtime: number; remoteHash?: string }
+		opts: { hash: string; mtime: number; remoteHash?: string; message?: string }
 	): Promise<void>;
 	remove(path: string, remoteHash?: string): Promise<void>;
 	hashData(data: ArrayBuffer): Promise<string>;

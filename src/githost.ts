@@ -142,12 +142,15 @@ export class GitHostBackend implements StorageBackend {
 	async upload(
 		path: string,
 		data: ArrayBuffer,
-		opts: { hash: string; mtime: number; remoteHash?: string }
+		opts: { hash: string; mtime: number; remoteHash?: string; message?: string }
 	): Promise<void> {
 		const url = `${this.repoBase}/contents/${encodePath(path)}`;
+		const fallbackMessage = opts.remoteHash
+			? messages().commitUpdate(path)
+			: messages().commitAdd(path);
 		const body: Record<string, unknown> = {
 			content: arrayBufferToBase64(data),
-			message: opts.remoteHash ? messages().commitUpdate(path) : messages().commitAdd(path),
+			message: opts.message && opts.message.trim() ? opts.message.trim() : fallbackMessage,
 			branch: this.cfg.branch,
 		};
 		if (opts.remoteHash) body.sha = opts.remoteHash;
