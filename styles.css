@@ -83,10 +83,6 @@
 .gitee-sync-plus-panel-item:hover {
 	background: var(--background-modifier-hover);
 }
-.gitee-sync-plus-panel-stage-btn {
-	flex: 0 0 auto;
-	margin-right: 2px;
-}
 .gitee-sync-plus-panel-item-status {
 	flex: 0 0 auto;
 	min-width: 16px;
@@ -110,11 +106,15 @@
 }
 .gitee-sync-plus-panel-item-path {
 	flex: 1 1 auto;
+	min-width: 0;
 	font-size: 0.8em;
-	word-break: break-all;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .gitee-sync-plus-panel-icon-btn {
 	display: inline-flex;
+	flex: 0 0 auto;
 	align-items: center;
 	justify-content: center;
 	width: 22px;

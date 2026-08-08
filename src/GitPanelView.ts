@@ -323,6 +323,12 @@ export class GitPanelView extends ItemView {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
 			row.setAttr("title", l.panelClickToDiff);
 
+			row.createSpan({
+				text: item.tag,
+				cls: `gitee-sync-plus-panel-item-status s-${item.kind}`,
+			});
+			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
+
 			if (mode === "unstaged") {
 				const btn = row.createEl("button", {
 					text: "+",
@@ -344,12 +350,6 @@ export class GitPanelView extends ItemView {
 					this.toggleStage(item.path, false);
 				});
 			}
-
-			row.createSpan({
-				text: item.tag,
-				cls: `gitee-sync-plus-panel-item-status s-${item.kind}`,
-			});
-			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
 			if (item.discardable) {
 				const btn = row.createEl("button", {
 					text: "↩",
