@@ -115,3 +115,92 @@
 	font-size: 0.85em;
 	padding: 4px;
 }
+
+/* ===== Diff view ===== */
+.gitee-sync-plus-diff {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+.gitee-sync-plus-diff-header {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.gitee-sync-plus-diff-content {
+	flex: 1;
+	overflow: auto;
+	padding: 8px;
+}
+.gitee-sync-plus-diff-labels {
+	display: flex;
+	margin-bottom: 6px;
+	font-size: 0.75em;
+	color: var(--text-muted);
+	font-weight: 600;
+}
+.gitee-sync-plus-diff-label {
+	flex: 1 1 50%;
+	padding: 2px 6px;
+}
+.gitee-sync-plus-diff-label-left {
+	border-bottom: 2px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-label-right {
+	border-bottom: 2px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-family: var(--font-monospace);
+	font-size: 0.82em;
+	line-height: 1.45;
+}
+.gitee-sync-plus-diff-row {
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+.gitee-sync-plus-diff-num {
+	width: 36px;
+	min-width: 36px;
+	max-width: 36px;
+	text-align: right;
+	padding: 1px 6px;
+	color: var(--text-faint);
+	background: var(--background-secondary);
+	border-right: 1px solid var(--background-modifier-border);
+	user-select: none;
+}
+.gitee-sync-plus-diff-cell {
+	width: 50%;
+	padding: 1px 6px;
+	white-space: pre;
+	vertical-align: top;
+}
+.gitee-sync-plus-diff-empty {
+	background: repeating-linear-gradient(
+		45deg,
+		var(--background-primary),
+		var(--background-primary) 8px,
+		var(--background-modifier-border-hover) 8px,
+		var(--background-modifier-border-hover) 16px
+	);
+}
+.gitee-sync-plus-diff-row.state-equal .gitee-sync-plus-diff-cell {
+	background: var(--background-primary);
+}
+.gitee-sync-plus-diff-row.state-delete .gitee-sync-plus-diff-cell:first-of-type,
+.gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell:first-of-type {
+	background: rgba(var(--color-red-rgb), 0.12);
+}
+.gitee-sync-plus-diff-row.state-insert .gitee-sync-plus-diff-cell:last-child,
+.gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell:last-child {
+	background: rgba(var(--color-green-rgb), 0.12);
+}
+.gitee-sync-plus-diff-error {
+	color: var(--text-error);
+	padding: 12px;
+}

@@ -2,6 +2,7 @@ import { App, ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { messages } from "./i18n";
 import { SyncEngine, SyncPlan } from "./sync";
+import { DiffKind, openDiffView } from "./DiffView";
 
 export const GIT_PANEL_VIEW_TYPE = "gitee-sync-plus-git-panel";
 
@@ -12,6 +13,7 @@ interface PanelItem {
 	tag: string;
 	kind: ItemKind;
 	discardable: boolean;
+	group: "local" | "remote";
 }
 
 /** Destructive-action confirm modal (discard local changes). */
@@ -200,12 +202,14 @@ export class GitPanelView extends ItemView {
 				tag: x.rem ? l.statusTagModified : l.statusTagAdded,
 				kind: (x.rem ? "mod" : "add") as ItemKind,
 				discardable: true,
+				group: "local" as const,
 			})),
 			...p.localDeletes.map((x) => ({
 				path: x.path,
 				tag: l.statusTagDeleted,
 				kind: "del" as ItemKind,
 				discardable: false,
+				group: "local" as const,
 			})),
 		];
 		const remoteItems: PanelItem[] = [
@@ -214,12 +218,14 @@ export class GitPanelView extends ItemView {
 				tag: l.statusTagRemote,
 				kind: "remote" as ItemKind,
 				discardable: false,
+				group: "remote" as const,
 			})),
 			...p.remoteDeletes.map((x) => ({
 				path: x.path,
 				tag: l.statusTagDeleted,
 				kind: "del" as ItemKind,
 				discardable: false,
+				group: "remote" as const,
 			})),
 		];
 
@@ -257,20 +263,39 @@ export class GitPanelView extends ItemView {
 		}
 		for (const item of items) {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
+			row.setAttr("title", l.panelClickToDiff);
 			row.createSpan({
 				text: item.tag,
 				cls: `gitee-sync-plus-panel-item-status s-${item.kind}`,
 			});
 			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
 			if (item.discardable) {
-				row
-					.createEl("button", {
-						text: l.panelDiscard,
-						cls: "gitee-sync-plus-panel-mini-btn",
-					})
-					.addEventListener("click", () => this.onDiscard(item.path));
+				const btn = row.createEl("button", {
+					text: l.panelDiscard,
+					cls: "gitee-sync-plus-panel-mini-btn",
+				});
+				btn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.onDiscard(item.path);
+				});
 			}
+			row.addEventListener("click", () => void this.openDiff(item));
 		}
+	}
+
+	private openDiff(item: PanelItem): void {
+		const kind = this.mapKind(item);
+		void openDiffView(this.plugin, item.path, kind);
+	}
+
+	private mapKind(item: PanelItem): DiffKind {
+		if (item.group === "local") {
+			if (item.kind === "add") return "local-add";
+			if (item.kind === "del") return "local-del";
+			return "local-mod";
+		}
+		if (item.kind === "del") return "remote-del";
+		return "remote-mod";
 	}
 
 	private onDiscard(path: string): void {

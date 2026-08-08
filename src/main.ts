@@ -3,6 +3,7 @@ import { GitIgnoreManager } from "./gitignore";
 import { formatDateTime, formatTime, messages } from "./i18n";
 import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
 import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./GitPanelView";
+import { DIFF_VIEW_TYPE, DiffView } from "./DiffView";
 import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
 
 interface HashCacheEntry {
@@ -62,6 +63,7 @@ export default class CloudSyncPlugin extends Plugin {
 		});
 
 		this.registerView(GIT_PANEL_VIEW_TYPE, (leaf) => new GitPanelView(leaf, this));
+		this.registerView(DIFF_VIEW_TYPE, (leaf) => new DiffView(leaf));
 		this.addRibbonIcon("git-pull-request-arrow", l.panelRibbon, () => void this.activateGitPanel());
 		this.addCommand({
 			id: "open-git-panel",
