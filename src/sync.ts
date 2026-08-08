@@ -1,5 +1,5 @@
 import { Vault } from "obsidian";
-import { createBackend, RemoteEntry, StorageBackend } from "./backend";
+import { BatchDelete, BatchFileChange, createBackend, RemoteEntry, StorageBackend } from "./backend";
 import { formatDateTime, messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
 
@@ -113,25 +113,56 @@ export class SyncEngine {
 				});
 			}
 
-			// Phase 2: send local changes out (sha-guarded, so a concurrent remote
-			// change surfaces as an API error instead of a silent overwrite).
-			for (const { path, loc, rem } of plan.pushes) {
-				await step(path, async () => {
+			// Phase 2: send local changes out.
+			if (this.plugin.settings.commitMode === "batch" && backend.batchCommit) {
+				// Batch mode: all pushes and remote deletes in a single commit.
+				const batchFiles: BatchFileChange[] = [];
+				for (const { path, loc, rem } of plan.pushes) {
 					const data = await this.vault.adapter.readBinary(loc.path);
-					await backend.upload(path, data, {
-						hash: loc.hash,
-						mtime: loc.mtime,
-						remoteHash: rem?.hash,
-					});
+					batchFiles.push({ path, data, remoteHash: rem?.hash });
+				}
+				const batchDeletes: BatchDelete[] = plan.remoteDeletes.map(({ path, rem }) => ({
+					path,
+					remoteHash: rem.hash,
+				}));
+				if (batchFiles.length > 0 || batchDeletes.length > 0) {
+					try {
+						await backend.batchCommit(batchFiles, batchDeletes);
+					} catch (e) {
+						const msg = e instanceof Error ? e.message : String(e);
+						throw new Error(
+							l.batchCommitFailed(batchFiles.length, batchDeletes.length, msg)
+						);
+					}
+				}
+				for (const { path, loc } of plan.pushes) {
 					nextState[path] = loc.hash;
 					summary.pushed++;
-				});
-			}
-			for (const { path, rem } of plan.remoteDeletes) {
-				await step(path, async () => {
-					await backend.remove(path, rem.hash);
+				}
+				for (const { path } of plan.remoteDeletes) {
 					summary.deletedRemote++;
-				});
+				}
+			} else {
+				// Per-file mode: sha-guarded, so a concurrent remote change surfaces
+				// as an API error instead of a silent overwrite.
+				for (const { path, loc, rem } of plan.pushes) {
+					await step(path, async () => {
+						const data = await this.vault.adapter.readBinary(loc.path);
+						await backend.upload(path, data, {
+							hash: loc.hash,
+							mtime: loc.mtime,
+							remoteHash: rem?.hash,
+						});
+						nextState[path] = loc.hash;
+						summary.pushed++;
+					});
+				}
+				for (const { path, rem } of plan.remoteDeletes) {
+					await step(path, async () => {
+						await backend.remove(path, rem.hash);
+						summary.deletedRemote++;
+					});
+				}
 			}
 		} catch (e) {
 			// Persist what already succeeded so a re-run doesn't redo it.

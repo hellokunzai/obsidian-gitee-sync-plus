@@ -1,5 +1,5 @@
 import { arrayBufferToBase64, base64ToArrayBuffer, requestUrl, RequestUrlResponse } from "obsidian";
-import type { RemoteEntry, StorageBackend } from "./backend";
+import type { BatchDelete, BatchFileChange, RemoteEntry, StorageBackend } from "./backend";
 import { messages } from "./i18n";
 
 export type GitHost = "gitee" | "github";
@@ -175,7 +175,122 @@ export class GitHostBackend implements StorageBackend {
 		}
 	}
 
-hashData(data: ArrayBuffer): Promise<string> {
+	async batchCommit(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+		if (files.length === 0 && deletes.length === 0) return;
+		if (this.isGithub) {
+			await this.batchCommitGithub(files, deletes);
+		} else {
+			await this.batchCommitGitee(files, deletes);
+		}
+	}
+
+	/**
+	 * Gitee: POST /repos/{owner}/{repo}/commits — "提交多个文件变更".
+	 * A single API call that creates one commit with all file changes.
+	 */
+	private async batchCommitGitee(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+		const l = messages();
+		const actions: Record<string, unknown>[] = [];
+		for (const f of files) {
+			actions.push({
+				action: f.remoteHash ? "update" : "create",
+				path: f.path,
+				content: arrayBufferToBase64(f.data),
+				encoding: "base64",
+			});
+		}
+		for (const d of deletes) {
+			actions.push({ action: "delete", path: d.path });
+		}
+		await this.request("POST", `${this.repoBase}/commits`, {
+			branch: this.cfg.branch,
+			message: l.commitBatch(files.length, deletes.length),
+			actions,
+		});
+	}
+
+	/**
+	 * GitHub: uses the Git Database API to batch multiple file changes into one commit.
+	 * Flow: get ref → get tree → create blobs → create tree → create commit → update ref.
+	 * The ref update with force:false provides fast-forward protection against
+	 * concurrent remote changes.
+	 */
+	private async batchCommitGithub(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+		const l = messages();
+
+		// 1. Get current commit SHA and tree SHA (skip if branch doesn't exist yet)
+		let parentSha: string | undefined;
+		let baseTreeSha: string | undefined;
+		try {
+			const refResp = await this.request(
+				"GET",
+				`${this.repoBase}/git/refs/heads/${encodeURIComponent(this.cfg.branch)}`
+			);
+			parentSha = (refResp.json as { object: { sha: string } }).object.sha;
+			const commitResp = await this.request("GET", `${this.repoBase}/git/commits/${parentSha}`);
+			baseTreeSha = (commitResp.json as { tree: { sha: string } }).tree.sha;
+		} catch (e) {
+			// New repo with no commits — proceed without a parent
+			if (!(e instanceof GitHostError) || (e.status !== 404 && e.status !== 409)) throw e;
+		}
+
+		// 2. Create blobs for each file and build tree entries
+		const treeEntries: Record<string, unknown>[] = [];
+		for (const f of files) {
+			const blobResp = await this.request("POST", `${this.repoBase}/git/blobs`, {
+				content: arrayBufferToBase64(f.data),
+				encoding: "base64",
+			});
+			treeEntries.push({
+				path: f.path,
+				mode: "100644",
+				type: "blob",
+				sha: (blobResp.json as { sha: string }).sha,
+			});
+		}
+		// 3. Add delete entries (sha: null removes the path from the base tree)
+		for (const d of deletes) {
+			treeEntries.push({
+				path: d.path,
+				mode: "100644",
+				type: "blob",
+				sha: null,
+			});
+		}
+
+		// 4. Create new tree (based on current tree if it exists)
+		const treeBody: Record<string, unknown> = { tree: treeEntries };
+		if (baseTreeSha) treeBody.base_tree = baseTreeSha;
+		const treeResp = await this.request("POST", `${this.repoBase}/git/trees`, treeBody);
+		const newTreeSha = (treeResp.json as { sha: string }).sha;
+
+		// 5. Create commit
+		const commitBody: Record<string, unknown> = {
+			message: l.commitBatch(files.length, deletes.length),
+			tree: newTreeSha,
+		};
+		if (parentSha) commitBody.parents = [parentSha];
+		const newCommitResp = await this.request("POST", `${this.repoBase}/git/commits`, commitBody);
+		const newCommitSha = (newCommitResp.json as { sha: string }).sha;
+
+		// 6. Update or create the branch ref
+		if (parentSha) {
+			// Existing branch: update ref with fast-forward protection
+			await this.request(
+				"PATCH",
+				`${this.repoBase}/git/refs/heads/${encodeURIComponent(this.cfg.branch)}`,
+				{ sha: newCommitSha, force: false }
+			);
+		} else {
+			// New branch: create the ref
+			await this.request("POST", `${this.repoBase}/git/refs`, {
+				ref: `refs/heads/${this.cfg.branch}`,
+				sha: newCommitSha,
+			});
+		}
+	}
+
+	hashData(data: ArrayBuffer): Promise<string> {
 		return gitBlobSha1(data);
 	}
 

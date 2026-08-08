@@ -35,6 +35,7 @@ function clearBranchCache(host: string, owner: string, repo: string): void {
 }
 
 export type BackendType = "gitee" | "github";
+export type CommitMode = "per-file" | "batch";
 
 export interface SyncSettings {
 	backend: BackendType;
@@ -54,6 +55,7 @@ export interface SyncSettings {
 	/** @deprecated Migrated to the plugin-managed section of .gitignore. */
 	excludeFolders?: string;
 	debugLog: boolean;
+	commitMode: CommitMode;
 }
 
 export const DEFAULT_SETTINGS: SyncSettings = {
@@ -69,6 +71,7 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	autoSyncMinutes: 0,
 	syncOnStart: false,
 	debugLog: false,
+	commitMode: "per-file",
 };
 
 export class SyncSettingTab extends PluginSettingTab {
@@ -235,6 +238,20 @@ export class SyncSettingTab extends PluginSettingTab {
 					s.debugLog = v;
 					await save();
 				})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsCommitMode)
+			.setDesc(l.settingsCommitModeDesc)
+			.addDropdown((d) =>
+				d
+					.addOption("per-file", l.optionPerFile)
+					.addOption("batch", l.optionBatch)
+					.setValue(s.commitMode)
+					.onChange(async (v) => {
+						s.commitMode = v as CommitMode;
+						await save();
+					})
 			);
 	}
 

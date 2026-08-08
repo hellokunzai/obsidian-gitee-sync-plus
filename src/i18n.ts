@@ -37,6 +37,10 @@ const en = {
 	commitAdd: (path: string) => `sync: add ${path}`,
 	commitUpdate: (path: string) => `sync: update ${path}`,
 	commitDelete: (path: string) => `sync: delete ${path}`,
+	commitBatch: (uploaded: number, deleted: number) =>
+		`sync: batch — ${uploaded} updated${deleted ? `, ${deleted} deleted` : ""}`,
+	batchCommitFailed: (uploaded: number, deleted: number, message: string) =>
+		`Batch commit failed (${uploaded} files to update, ${deleted} to delete): ${message}`,
 
 	settingsBackend: "Storage backend",
 	settingsBackendDesc:
@@ -68,6 +72,11 @@ const en = {
 	settingsDebugLog: "Diagnostic log",
 	settingsDebugLogDesc:
 		"Record each sync plan and result in _gitee-sync-plus-log.md at the vault root. The log should be excluded from sync via .gitignore.",
+	settingsCommitMode: "Commit mode",
+	settingsCommitModeDesc:
+		"Choose whether each file gets its own commit or all changes are combined into a single commit.",
+	optionPerFile: "One commit per file",
+	optionBatch: "One commit for all changes (batch)",
 
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
@@ -138,6 +147,10 @@ const zh: typeof en = {
 	commitAdd: (path) => `同步：新增 ${path}`,
 	commitUpdate: (path) => `同步：更新 ${path}`,
 	commitDelete: (path) => `同步：删除 ${path}`,
+	commitBatch: (uploaded, deleted) =>
+		`同步：批量提交 — ${uploaded} 更新${deleted ? `，${deleted} 删除` : ""}`,
+	batchCommitFailed: (uploaded, deleted, message) =>
+		`批量提交失败（${uploaded} 个文件待更新，${deleted} 个待删除）：${message}`,
 
 	settingsBackend: "存储后端",
 	settingsBackendDesc: "切换后端后，首次同步会对两边差异做一次全量对账，并保留修改时间较新的版本。",
@@ -167,6 +180,10 @@ const zh: typeof en = {
 	settingsDebugLog: "调试日志",
 	settingsDebugLogDesc:
 		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-plus-log.md（建议通过 .gitignore 排除同步）。",
+	settingsCommitMode: "提交模式",
+	settingsCommitModeDesc: "选择每个文件单独提交一次，还是将所有变更合并为一次提交。",
+	optionPerFile: "每文件单独提交",
+	optionBatch: "合并为一次提交（批量）",
 
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",

@@ -10,6 +10,21 @@ export interface RemoteEntry {
 	size: number;
 }
 
+/** A file to create or update in a batch commit. */
+export interface BatchFileChange {
+	path: string;
+	data: ArrayBuffer;
+	/** Blob SHA of the existing remote file (undefined for new files). */
+	remoteHash?: string;
+}
+
+/** A file to delete in a batch commit. */
+export interface BatchDelete {
+	path: string;
+	/** Blob SHA of the remote file to delete. */
+	remoteHash: string;
+}
+
 /**
  * Storage abstraction the sync engine runs against. Hashes are opaque to the
  * engine — it only compares them for equality — but local and remote hashes
@@ -29,6 +44,12 @@ export interface StorageBackend {
 	hashData(data: ArrayBuffer): Promise<string>;
 	/** Optional precise mtime lookup, used only for conflict resolution when manifest mtime is 0. */
 	statMtime?(path: string): Promise<number>;
+	/**
+	 * If implemented, combines multiple file changes and deletions into a single
+	 * commit on the remote. When the sync engine's commitMode is "batch" and this
+	 * method exists, it is used instead of per-file upload/remove calls.
+	 */
+	batchCommit?(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void>;
 }
 
 export function createBackend(s: SyncSettings): StorageBackend {
