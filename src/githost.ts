@@ -175,12 +175,12 @@ export class GitHostBackend implements StorageBackend {
 		}
 	}
 
-	async batchCommit(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+	async batchCommit(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void> {
 		if (files.length === 0 && deletes.length === 0) return;
 		if (this.isGithub) {
-			await this.batchCommitGithub(files, deletes);
+			await this.batchCommitGithub(files, deletes, message);
 		} else {
-			await this.batchCommitGitee(files, deletes);
+			await this.batchCommitGitee(files, deletes, message);
 		}
 	}
 
@@ -188,7 +188,7 @@ export class GitHostBackend implements StorageBackend {
 	 * Gitee: POST /repos/{owner}/{repo}/commits — "提交多个文件变更".
 	 * A single API call that creates one commit with all file changes.
 	 */
-	private async batchCommitGitee(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+	private async batchCommitGitee(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void> {
 		const l = messages();
 		const actions: Record<string, unknown>[] = [];
 		for (const f of files) {
@@ -204,7 +204,7 @@ export class GitHostBackend implements StorageBackend {
 		}
 		await this.request("POST", `${this.repoBase}/commits`, {
 			branch: this.cfg.branch,
-			message: l.commitBatch(files.length, deletes.length),
+			message: message && message.trim() ? message.trim() : l.commitBatch(files.length, deletes.length),
 			actions,
 		});
 	}
@@ -215,7 +215,7 @@ export class GitHostBackend implements StorageBackend {
 	 * The ref update with force:false provides fast-forward protection against
 	 * concurrent remote changes.
 	 */
-	private async batchCommitGithub(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void> {
+	private async batchCommitGithub(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void> {
 		const l = messages();
 
 		// 1. Get current commit SHA and tree SHA (skip if branch doesn't exist yet)
@@ -266,7 +266,7 @@ export class GitHostBackend implements StorageBackend {
 
 		// 5. Create commit
 		const commitBody: Record<string, unknown> = {
-			message: l.commitBatch(files.length, deletes.length),
+			message: message && message.trim() ? message.trim() : l.commitBatch(files.length, deletes.length),
 			tree: newTreeSha,
 		};
 		if (parentSha) commitBody.parents = [parentSha];

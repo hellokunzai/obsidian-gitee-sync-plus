@@ -49,7 +49,7 @@ export interface StorageBackend {
 	 * commit on the remote. When the sync engine's commitMode is "batch" and this
 	 * method exists, it is used instead of per-file upload/remove calls.
 	 */
-	batchCommit?(files: BatchFileChange[], deletes: BatchDelete[]): Promise<void>;
+	batchCommit?(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void>;
 }
 
 export function createBackend(s: SyncSettings): StorageBackend {

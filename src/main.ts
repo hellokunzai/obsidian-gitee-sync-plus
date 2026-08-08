@@ -2,6 +2,7 @@ import { Notice, Plugin } from "obsidian";
 import { GitIgnoreManager } from "./gitignore";
 import { formatDateTime, formatTime, messages } from "./i18n";
 import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
+import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./GitPanelView";
 import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
 
 interface HashCacheEntry {
@@ -58,6 +59,14 @@ export default class CloudSyncPlugin extends Plugin {
 			id: "sync-preview",
 			name: l.commandPreview,
 			callback: () => void this.runPreview(),
+		});
+
+		this.registerView(GIT_PANEL_VIEW_TYPE, (leaf) => new GitPanelView(leaf, this));
+		this.addRibbonIcon("git-pull-request-arrow", l.panelRibbon, () => void this.activateGitPanel());
+		this.addCommand({
+			id: "open-git-panel",
+			name: l.panelOpenCommand,
+			callback: () => void this.activateGitPanel(),
 		});
 
 		this.setupAutoSync();
@@ -149,6 +158,24 @@ export default class CloudSyncPlugin extends Plugin {
 			new Notice(l.previewFailed(msg), 8000);
 			await this.appendLog(l.previewFailedLog(formatDateTime(), msg));
 		}
+	}
+
+	/** Opens (or focuses) the Git panel in the right sidebar. */
+	async activateGitPanel(): Promise<void> {
+		const { workspace } = this.app;
+		let leaf = workspace.getLeavesOfType(GIT_PANEL_VIEW_TYPE)[0];
+		if (!leaf) {
+			const sideLeaf = workspace.getRightLeaf(false) ?? workspace.getRightLeaf(true);
+			if (!sideLeaf) return;
+			leaf = sideLeaf;
+			await leaf.setViewState({ type: GIT_PANEL_VIEW_TYPE, active: true });
+		}
+		workspace.revealLeaf(leaf);
+	}
+
+	/** Shows a Notice summarizing a sync result (used by the Git panel). */
+	announceSummary(s: SyncSummary): void {
+		new Notice(this.formatSummary(s));
 	}
 
 	/** Appends to the diagnostic note (which is itself excluded from sync). */

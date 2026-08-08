@@ -2,3 +2,116 @@
 	width: 100%;
 	font-family: monospace;
 }
+
+/* ===== Git panel (sidebar) ===== */
+.gitee-sync-plus-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px;
+	overflow-y: auto;
+}
+.gitee-sync-plus-panel-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 6px;
+}
+.gitee-sync-plus-panel-title {
+	font-weight: 600;
+}
+.gitee-sync-plus-panel-status {
+	font-size: 0.78em;
+	color: var(--text-muted);
+	text-align: right;
+}
+.gitee-sync-plus-panel-info {
+	font-size: 0.78em;
+	color: var(--text-muted);
+	word-break: break-all;
+}
+.gitee-sync-plus-panel-textarea {
+	width: 100%;
+	min-height: 48px;
+	resize: vertical;
+	font-size: 0.85em;
+}
+.gitee-sync-plus-panel-hint {
+	font-size: 0.72em;
+	color: var(--text-faint);
+}
+.gitee-sync-plus-panel-buttons {
+	display: flex;
+	gap: 6px;
+}
+.gitee-sync-plus-panel-btn {
+	flex: 1;
+}
+.gitee-sync-plus-panel-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.gitee-sync-plus-panel-group-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+}
+.gitee-sync-plus-panel-group-title {
+	font-size: 0.82em;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+.gitee-sync-plus-panel-group-empty {
+	font-size: 0.78em;
+	color: var(--text-faint);
+	padding-left: 4px;
+}
+.gitee-sync-plus-panel-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 4px;
+	border-radius: 4px;
+}
+.gitee-sync-plus-panel-item:hover {
+	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-panel-item-status {
+	flex: 0 0 auto;
+	min-width: 18px;
+	text-align: center;
+	font-family: var(--font-monospace);
+	font-size: 0.75em;
+	font-weight: 700;
+	border-radius: 3px;
+	padding: 1px 3px;
+	background: var(--background-modifier-border);
+}
+.gitee-sync-plus-panel-item-status.s-mod {
+	color: var(--text-warning);
+}
+.gitee-sync-plus-panel-item-status.s-add {
+	color: var(--text-success);
+}
+.gitee-sync-plus-panel-item-status.s-del {
+	color: var(--text-error);
+}
+.gitee-sync-plus-panel-item-status.s-remote {
+	color: var(--text-accent);
+}
+.gitee-sync-plus-panel-item-path {
+	flex: 1 1 auto;
+	font-size: 0.8em;
+	word-break: break-all;
+}
+.gitee-sync-plus-panel-mini-btn {
+	font-size: 0.72em;
+	padding: 1px 6px;
+}
+.gitee-sync-plus-panel-empty {
+	color: var(--text-muted);
+	font-size: 0.85em;
+	padding: 4px;
+}

@@ -62,7 +62,7 @@ export class SyncEngine {
 		return { plan, report: this.formatPlan(plan, messages().previewTitle) };
 	}
 
-	async run(): Promise<SyncSummary> {
+	async run(message?: string): Promise<SyncSummary> {
 		const l = messages();
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
@@ -78,92 +78,10 @@ export class SyncEngine {
 			conflicts: plan.conflicts,
 		};
 		const nextState = { ...plan.nextState };
-		const step = async (path: string, fn: () => Promise<void>) => {
-			try {
-				await fn();
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : String(e);
-				throw new Error(l.pathFailed(path, msg));
-			}
-		};
 
 		try {
-			// Phase 1: bring remote changes in. An interrupted sync only ever
-			// leaves local work undone — the remote stays intact.
-			for (const { path, rem } of plan.pulls) {
-				await step(path, async () => {
-					const { data, hash, mtime } = await backend.download(path);
-					const localMtime = await this.writeLocal(path, data, mtime || rem.mtime);
-					const finalHash = hash || rem.hash;
-					nextState[path] = finalHash;
-					this.plugin.hashCache[path] = {
-						mtime: localMtime,
-						size: data.byteLength,
-						hash: finalHash,
-						algo: backend.id,
-					};
-					summary.pulled++;
-				});
-			}
-			for (const { path, loc } of plan.localDeletes) {
-				await step(path, async () => {
-					await this.vault.adapter.remove(loc.path);
-					delete this.plugin.hashCache[path];
-					summary.deletedLocal++;
-				});
-			}
-
-			// Phase 2: send local changes out.
-			if (this.plugin.settings.commitMode === "batch" && backend.batchCommit) {
-				// Batch mode: all pushes and remote deletes in a single commit.
-				const batchFiles: BatchFileChange[] = [];
-				for (const { path, loc, rem } of plan.pushes) {
-					const data = await this.vault.adapter.readBinary(loc.path);
-					batchFiles.push({ path, data, remoteHash: rem?.hash });
-				}
-				const batchDeletes: BatchDelete[] = plan.remoteDeletes.map(({ path, rem }) => ({
-					path,
-					remoteHash: rem.hash,
-				}));
-				if (batchFiles.length > 0 || batchDeletes.length > 0) {
-					try {
-						await backend.batchCommit(batchFiles, batchDeletes);
-					} catch (e) {
-						const msg = e instanceof Error ? e.message : String(e);
-						throw new Error(
-							l.batchCommitFailed(batchFiles.length, batchDeletes.length, msg)
-						);
-					}
-				}
-				for (const { path, loc } of plan.pushes) {
-					nextState[path] = loc.hash;
-					summary.pushed++;
-				}
-				for (const { path } of plan.remoteDeletes) {
-					summary.deletedRemote++;
-				}
-			} else {
-				// Per-file mode: sha-guarded, so a concurrent remote change surfaces
-				// as an API error instead of a silent overwrite.
-				for (const { path, loc, rem } of plan.pushes) {
-					await step(path, async () => {
-						const data = await this.vault.adapter.readBinary(loc.path);
-						await backend.upload(path, data, {
-							hash: loc.hash,
-							mtime: loc.mtime,
-							remoteHash: rem?.hash,
-						});
-						nextState[path] = loc.hash;
-						summary.pushed++;
-					});
-				}
-				for (const { path, rem } of plan.remoteDeletes) {
-					await step(path, async () => {
-						await backend.remove(path, rem.hash);
-						summary.deletedRemote++;
-					});
-				}
-			}
+			await this.executePull(backend, plan, nextState, summary);
+			await this.executePush(backend, plan, nextState, summary, message);
 		} catch (e) {
 			// Persist what already succeeded so a re-run doesn't redo it.
 			this.plugin.syncState = nextState;
@@ -196,6 +114,212 @@ export class SyncEngine {
 			);
 		}
 		return summary;
+	}
+
+	/** Builds the three-way sync plan without transferring anything. */
+	async computePlan(): Promise<SyncPlan> {
+		return this.buildPlan(createBackend(this.plugin.settings));
+	}
+
+	/** Phase 1 only: download remote changes and apply remote deletions. */
+	async pullRemote(): Promise<SyncSummary> {
+		const backend = createBackend(this.plugin.settings);
+		const plan = await this.buildPlan(backend);
+		const summary: SyncSummary = {
+			pushed: 0,
+			pulled: 0,
+			deletedLocal: 0,
+			deletedRemote: 0,
+			conflicts: plan.conflicts,
+		};
+		const nextState = { ...plan.nextState };
+		try {
+			await this.executePull(backend, plan, nextState, summary);
+		} catch (e) {
+			this.plugin.syncState = nextState;
+			await this.plugin.savePluginData();
+			throw e;
+		}
+		this.plugin.syncState = nextState;
+		await this.plugin.savePluginData();
+		return summary;
+	}
+
+	/** Phase 2 only: push local changes (and remote deletions). When commitMode
+	 * is "batch", `message` overrides the auto-generated batch commit message. */
+	async pushLocal(message?: string): Promise<SyncSummary> {
+		const backend = createBackend(this.plugin.settings);
+		const plan = await this.buildPlan(backend);
+		const summary: SyncSummary = {
+			pushed: 0,
+			pulled: 0,
+			deletedLocal: 0,
+			deletedRemote: 0,
+			conflicts: plan.conflicts,
+		};
+		const nextState = { ...plan.nextState };
+		try {
+			await this.executePush(backend, plan, nextState, summary, message);
+		} catch (e) {
+			this.plugin.syncState = nextState;
+			await this.plugin.savePluginData();
+			throw e;
+		}
+		this.plugin.syncState = nextState;
+		await this.plugin.savePluginData();
+		return summary;
+	}
+
+	/**
+	 * Discards local working-tree changes for the given paths so they will no
+	 * longer be pushed on the next sync:
+	 * - a file that exists remotely → download the remote copy, overwriting the
+	 *   local edit (reverts to the last synced version);
+	 * - a newly added local file (not on remote) → delete the local copy.
+	 * Only entries in plan.pushes are eligible — these are changes introduced
+	 * locally since the last successful sync.
+	 */
+	async discardChanges(plan: SyncPlan, paths: string[]): Promise<number> {
+		const backend = createBackend(this.plugin.settings);
+		const wanted = new Set(paths);
+		const nextState = { ...this.plugin.syncState };
+		let count = 0;
+		for (const p of plan.pushes) {
+			if (!wanted.has(p.path)) continue;
+			if (p.rem) {
+				const { data, hash, mtime } = await backend.download(p.path);
+				const localMtime = await this.writeLocal(p.path, data, mtime || p.rem.mtime);
+				const finalHash = hash || p.rem.hash;
+				nextState[p.path] = finalHash;
+				this.plugin.hashCache[p.path] = {
+					mtime: localMtime,
+					size: data.byteLength,
+					hash: finalHash,
+					algo: backend.id,
+				};
+			} else {
+				if (await this.vault.adapter.exists(p.path)) {
+					await this.vault.adapter.remove(p.path);
+				}
+				delete this.plugin.hashCache[p.path];
+				delete nextState[p.path];
+			}
+			count++;
+		}
+		this.plugin.syncState = nextState;
+		await this.plugin.savePluginData();
+		return count;
+	}
+
+	private async executePull(
+		backend: StorageBackend,
+		plan: SyncPlan,
+		nextState: Record<string, string>,
+		summary: SyncSummary
+	): Promise<void> {
+		const l = messages();
+		const step = async (path: string, fn: () => Promise<void>) => {
+			try {
+				await fn();
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : String(e);
+				throw new Error(l.pathFailed(path, msg));
+			}
+		};
+		// Phase 1: bring remote changes in. An interrupted sync only ever
+		// leaves local work undone — the remote stays intact.
+		for (const { path, rem } of plan.pulls) {
+			await step(path, async () => {
+				const { data, hash, mtime } = await backend.download(path);
+				const localMtime = await this.writeLocal(path, data, mtime || rem.mtime);
+				const finalHash = hash || rem.hash;
+				nextState[path] = finalHash;
+				this.plugin.hashCache[path] = {
+					mtime: localMtime,
+					size: data.byteLength,
+					hash: finalHash,
+					algo: backend.id,
+				};
+				summary.pulled++;
+			});
+		}
+		for (const { path, loc } of plan.localDeletes) {
+			await step(path, async () => {
+				await this.vault.adapter.remove(loc.path);
+				delete this.plugin.hashCache[path];
+				summary.deletedLocal++;
+			});
+		}
+	}
+
+	private async executePush(
+		backend: StorageBackend,
+		plan: SyncPlan,
+		nextState: Record<string, string>,
+		summary: SyncSummary,
+		message?: string
+	): Promise<void> {
+		const l = messages();
+		const step = async (path: string, fn: () => Promise<void>) => {
+			try {
+				await fn();
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : String(e);
+				throw new Error(l.pathFailed(path, msg));
+			}
+		};
+
+		// Phase 2: send local changes out.
+		if (this.plugin.settings.commitMode === "batch" && backend.batchCommit) {
+			// Batch mode: all pushes and remote deletes in a single commit.
+			const batchFiles: BatchFileChange[] = [];
+			for (const { path, loc, rem } of plan.pushes) {
+				const data = await this.vault.adapter.readBinary(loc.path);
+				batchFiles.push({ path, data, remoteHash: rem?.hash });
+			}
+			const batchDeletes: BatchDelete[] = plan.remoteDeletes.map(({ path, rem }) => ({
+				path,
+				remoteHash: rem.hash,
+			}));
+			if (batchFiles.length > 0 || batchDeletes.length > 0) {
+				try {
+					await backend.batchCommit(batchFiles, batchDeletes, message);
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : String(e);
+					throw new Error(
+						l.batchCommitFailed(batchFiles.length, batchDeletes.length, msg)
+					);
+				}
+			}
+			for (const { path, loc } of plan.pushes) {
+				nextState[path] = loc.hash;
+				summary.pushed++;
+			}
+			for (const { path } of plan.remoteDeletes) {
+				summary.deletedRemote++;
+			}
+		} else {
+			// Per-file mode: sha-guarded, so a concurrent remote change surfaces
+			// as an API error instead of a silent overwrite.
+			for (const { path, loc, rem } of plan.pushes) {
+				await step(path, async () => {
+					const data = await this.vault.adapter.readBinary(loc.path);
+					await backend.upload(path, data, {
+						hash: loc.hash,
+						mtime: loc.mtime,
+						remoteHash: rem?.hash,
+					});
+					nextState[path] = loc.hash;
+					summary.pushed++;
+				});
+			}
+			for (const { path, rem } of plan.remoteDeletes) {
+				await step(path, async () => {
+					await backend.remove(path, rem.hash);
+					summary.deletedRemote++;
+				});
+			}
+		}
 	}
 
 	private async buildPlan(backend: StorageBackend): Promise<SyncPlan> {
