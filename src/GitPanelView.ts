@@ -288,6 +288,14 @@ export class GitPanelView extends ItemView {
 			cls: "gitee-sync-plus-panel-group-title",
 		});
 		const headerBtns = header.createDiv("gitee-sync-plus-panel-group-actions");
+		if (actions?.discardAll) {
+			const btn = headerBtns.createEl("button", {
+				text: "↩",
+				cls: "gitee-sync-plus-panel-icon-btn",
+				title: l.panelDiscardAll,
+			});
+			btn.addEventListener("click", actions.discardAll);
+		}
 		if (actions?.stageAll) {
 			const btn = headerBtns.createEl("button", {
 				text: "+",
@@ -303,14 +311,6 @@ export class GitPanelView extends ItemView {
 				title: l.panelUnstageAllHint,
 			});
 			btn.addEventListener("click", actions.unstageAll);
-		}
-		if (actions?.discardAll) {
-			const btn = headerBtns.createEl("button", {
-				text: "↩",
-				cls: "gitee-sync-plus-panel-icon-btn",
-				title: l.panelDiscardAll,
-			});
-			btn.addEventListener("click", actions.discardAll);
 		}
 		if (items.length === 0) {
 			group.createDiv({
