@@ -204,3 +204,29 @@
 	color: var(--text-error);
 	padding: 12px;
 }
+
+/* Revert-chunk button inside the right gutter cell */
+.gitee-sync-plus-diff-revert-btn {
+	position: absolute;
+	transform: translateX(calc(-100% - 6px));
+	font-size: 0.75em;
+	padding: 0 4px;
+	line-height: 1.4;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+	pointer-events: auto;
+}
+.gitee-sync-plus-diff-row:hover .gitee-sync-plus-diff-revert-btn {
+	opacity: 1;
+}
+.gitee-sync-plus-diff-num {
+	position: relative;
+}
+
+/* Modal button row used by revert-chunk confirm */
+.gitee-sync-plus-modal-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
+}

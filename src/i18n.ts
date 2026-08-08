@@ -151,6 +151,11 @@ const en = {
 	diffRightRemote: "Remote version",
 	diffLeftEmpty: "(empty)",
 	diffRightEmpty: "(empty)",
+	diffRevertChunk: "Revert this change block",
+	diffRevertChunkConfirm: (path: string) =>
+		`Revert this change block in "${path}"? The local file will be rewritten.`,
+	diffReverted: "Change block reverted",
+	diffRevertFailed: (msg: string) => `Revert failed: ${msg}`,
 	statusTagModified: "M",
 	cancel: "Cancel",
 	statusTagAdded: "U",
@@ -301,6 +306,11 @@ const zh: typeof en = {
 	diffRightRemote: "远端版本",
 	diffLeftEmpty: "（空）",
 	diffRightEmpty: "（空）",
+	diffRevertChunk: "还原此更改块",
+	diffRevertChunkConfirm: (path) =>
+		`确定要还原“${path}”中的这一块更改吗？本地文件将被重写。`,
+	diffReverted: "已还原更改块",
+	diffRevertFailed: (msg) => `还原失败：${msg}`,
 	statusTagModified: "M",
 	cancel: "取消",
 	statusTagAdded: "U",

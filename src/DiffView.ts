@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { createBackend } from "./backend";
 import { messages } from "./i18n";
@@ -18,6 +18,8 @@ interface DiffRow {
 	oldText: string;
 	newText: string;
 	state: "equal" | "delete" | "insert" | "change";
+	/** Index of the contiguous diff chunk this row belongs to. Equal rows get -1. */
+	chunkIndex: number;
 }
 
 /**
@@ -33,6 +35,9 @@ export class DiffView extends ItemView {
 	private diffContentEl: HTMLElement | null = null;
 	private busy = false;
 	private opened = false;
+	private currentRows: DiffRow[] = [];
+	private currentBeforeText = "";
+	private currentAfterText = "";
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -203,6 +208,9 @@ export class DiffView extends ItemView {
 		const beforeLines = splitLines(beforeText);
 		const afterLines = splitLines(afterText);
 		const rows = computeDiffRows(beforeLines, afterLines);
+		this.currentRows = rows;
+		this.currentBeforeText = beforeText;
+		this.currentAfterText = afterText;
 
 		// Legend / column labels
 		const labels = this.diffContentEl.createDiv("gitee-sync-plus-diff-labels");
@@ -212,6 +220,9 @@ export class DiffView extends ItemView {
 		const table = this.diffContentEl.createEl("table", { cls: "gitee-sync-plus-diff-table" });
 		for (const row of rows) {
 			const tr = table.createEl("tr", { cls: `gitee-sync-plus-diff-row state-${row.state}` });
+			if (row.chunkIndex >= 0) {
+				tr.setAttribute("data-chunk-index", String(row.chunkIndex));
+			}
 
 			const leftNum = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
 			const leftCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
@@ -243,7 +254,130 @@ export class DiffView extends ItemView {
 			} else if (row.state === "insert") {
 				leftCell.addClass("gitee-sync-plus-diff-empty");
 			}
+
+			// Revert-chunk button on the first row of each diff chunk.
+			if (row.chunkIndex >= 0 && this.isFirstRowOfChunk(row, rows)) {
+				const revertBtn = rightNum.createEl("button", {
+					text: "⟲",
+					title: l.diffRevertChunk,
+					cls: "gitee-sync-plus-diff-revert-btn",
+				});
+				revertBtn.addEventListener("click", (evt) => {
+					evt.stopPropagation();
+					void this.onRevertChunk(row.chunkIndex);
+				});
+			}
 		}
+	}
+
+	private isFirstRowOfChunk(row: DiffRow, rows: DiffRow[]): boolean {
+		const idx = rows.indexOf(row);
+		return idx === 0 || rows[idx - 1].chunkIndex !== row.chunkIndex;
+	}
+
+	private async onRevertChunk(chunkIndex: number): Promise<void> {
+		if (!this.viewState) return;
+		const l = messages();
+		new RevertConfirmModal(this.app, l.diffRevertChunkConfirm(this.viewState.path), () =>
+			void this.revertChunk(chunkIndex)
+		).open();
+	}
+
+	private async revertChunk(chunkIndex: number): Promise<void> {
+		if (!this.viewState || !this.diffContentEl) return;
+		const { path, kind } = this.viewState;
+		const l = messages();
+		this.diffContentEl.setText(l.diffLoading);
+
+		try {
+			const chunkRows = this.currentRows.filter((r) => r.chunkIndex === chunkIndex);
+			if (chunkRows.length === 0) return;
+
+			const newText = this.buildTextWithChunkReverted(kind, chunkRows);
+			await this.writeLocalText(path, newText);
+			new Notice(l.diffReverted);
+			void this.loadDiff();
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			console.error("[gitee-sync-plus] revert chunk failed", e);
+			new Notice(l.diffRevertFailed(msg));
+		}
+	}
+
+	private buildTextWithChunkReverted(kind: DiffKind, chunkRows: DiffRow[]): string {
+		const localIsAfter = kind.startsWith("local");
+		const targetLines = splitLines(localIsAfter ? this.currentAfterText : this.currentBeforeText);
+		const sourceLines = splitLines(localIsAfter ? this.currentBeforeText : this.currentAfterText);
+
+		const first = chunkRows[0];
+		const last = chunkRows[chunkRows.length - 1];
+
+		const targetStartLine = localIsAfter ? first.newLine : first.oldLine;
+		const targetEndLine = localIsAfter ? last.newLine : last.oldLine;
+		const sourceStartLine = localIsAfter ? first.oldLine : first.newLine;
+		const sourceEndLine = localIsAfter ? last.oldLine : last.newLine;
+
+		const targetStartIdx = targetStartLine > 0 ? targetStartLine - 1 : -1;
+		const targetEndIdx = targetEndLine > 0 ? targetEndLine - 1 : -1;
+		const sourceStartIdx = sourceStartLine > 0 ? sourceStartLine - 1 : -1;
+		const sourceEndIdx = sourceEndLine > 0 ? sourceEndLine - 1 : -1;
+
+		let newLines: string[];
+		if (targetStartIdx === -1 && targetLines.length === 0) {
+			// The whole local file is empty/deleted; restore from the source chunk.
+			newLines =
+				sourceStartIdx === -1
+					? []
+					: sourceLines.slice(sourceStartIdx, sourceEndIdx + 1);
+		} else {
+			const beforeChunk = targetStartIdx >= 0 ? targetLines.slice(0, targetStartIdx) : [];
+			const replacement =
+				sourceStartIdx === -1 ? [] : sourceLines.slice(sourceStartIdx, sourceEndIdx + 1);
+			const afterChunk =
+				targetEndIdx >= 0 ? targetLines.slice(targetEndIdx + 1) : targetLines.slice();
+			newLines = beforeChunk.concat(replacement).concat(afterChunk);
+		}
+
+		return newLines.join("\n");
+	}
+
+	private async writeLocalText(path: string, text: string): Promise<void> {
+		const encoder = new TextEncoder();
+		await this.app.vault.adapter.writeBinary(path, encoder.encode(text).buffer);
+	}
+}
+
+/** Simple confirm modal for reverting a diff chunk. */
+class RevertConfirmModal extends Modal {
+	private readonly message: string;
+	private readonly onConfirm: () => void;
+
+	constructor(app: any, message: string, onConfirm: () => void) {
+		super(app);
+		this.message = message;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl("p", { text: this.message });
+
+		const buttons = contentEl.createDiv({ cls: "gitee-sync-plus-modal-buttons" });
+
+		buttons
+			.createEl("button", { text: messages().cancel, cls: "mod-cta" })
+			.addEventListener("click", () => this.close());
+		buttons
+			.createEl("button", { text: messages().diffRevertChunk, cls: "mod-warning" })
+			.addEventListener("click", () => {
+				this.close();
+				this.onConfirm();
+			});
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 
@@ -263,6 +397,26 @@ function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 	let j = 0;
 	let oldLine = 1;
 	let newLine = 1;
+	let chunkIndex = -1;
+	let currentChunk = -1;
+
+	const flushChunk = () => {
+		currentChunk = -1;
+	};
+
+	const pushRow = (row: DiffRow) => {
+		if (row.state !== "equal") {
+			if (currentChunk === -1) {
+				chunkIndex++;
+				currentChunk = chunkIndex;
+			}
+			row.chunkIndex = currentChunk;
+		} else {
+			flushChunk();
+			row.chunkIndex = -1;
+		}
+		rows.push(row);
+	};
 
 	// Build index of lines in newLines for fast look-ahead.
 	const newIndex = new Map<string, number[]>();
@@ -275,12 +429,13 @@ function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 
 	while (i < oldLines.length || j < newLines.length) {
 		if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
-			rows.push({
+			pushRow({
 				oldLine,
 				newLine,
 				oldText: oldLines[i],
 				newText: newLines[j],
 				state: "equal",
+				chunkIndex: -1,
 			});
 			i++;
 			j++;
@@ -317,7 +472,7 @@ function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 			// No more equal lines: consume the rest as paired changes.
 			const oldChunk = oldLines.slice(i);
 			const newChunk = newLines.slice(j);
-			pushChangeBlock(rows, oldChunk, newChunk, oldLine, newLine);
+			pushChangeBlock(rows, oldChunk, newChunk, oldLine, newLine, pushRow);
 			break;
 		}
 
@@ -325,7 +480,7 @@ function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 			// New lines were inserted before matching old line i.
 			const inserted = newLines.slice(j, nextMatchNew);
 			for (const line of inserted) {
-				rows.push({ oldLine: 0, newLine, oldText: "", newText: line, state: "insert" });
+				pushRow({ oldLine: 0, newLine, oldText: "", newText: line, state: "insert", chunkIndex: -1 });
 				newLine++;
 			}
 			j = nextMatchNew;
@@ -333,13 +488,14 @@ function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 			// Old lines were deleted before matching new line j.
 			const deleted = oldLines.slice(i, nextMatchOld);
 			for (const line of deleted) {
-				rows.push({ oldLine, newLine: 0, oldText: line, newText: "", state: "delete" });
+				pushRow({ oldLine, newLine: 0, oldText: line, newText: "", state: "delete", chunkIndex: -1 });
 				oldLine++;
 			}
 			i = nextMatchOld;
 		}
 	}
 
+	flushChunk();
 	return rows;
 }
 
@@ -348,18 +504,20 @@ function pushChangeBlock(
 	oldChunk: string[],
 	newChunk: string[],
 	oldStart: number,
-	newStart: number
+	newStart: number,
+	pushRow: (row: DiffRow) => void
 ): void {
 	const len = Math.max(oldChunk.length, newChunk.length);
 	for (let k = 0; k < len; k++) {
 		const oldText = oldChunk[k] ?? "";
 		const newText = newChunk[k] ?? "";
-		rows.push({
+		pushRow({
 			oldLine: k < oldChunk.length ? oldStart + k : 0,
 			newLine: k < newChunk.length ? newStart + k : 0,
 			oldText,
 			newText,
 			state: oldText === newText ? "equal" : "change",
+			chunkIndex: -1,
 		});
 	}
 }
