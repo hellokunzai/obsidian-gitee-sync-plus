@@ -221,8 +221,7 @@ export class SyncSettingTab extends PluginSettingTab {
 			.addTextArea((t) => {
 				t.setValue(gitignoreContent);
 				t.inputEl.rows = 12;
-				t.inputEl.style.width = "100%";
-				t.inputEl.style.fontFamily = "monospace";
+				t.inputEl.addClass('gitee-sync-plus-gitignore-editor');
 				t.inputEl.addEventListener("blur", async () => {
 					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
 				});
