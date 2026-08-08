@@ -83,10 +83,9 @@
 .gitee-sync-plus-panel-item:hover {
 	background: var(--background-modifier-hover);
 }
-.gitee-sync-plus-panel-checkbox {
+.gitee-sync-plus-panel-stage-btn {
 	flex: 0 0 auto;
-	margin: 0;
-	cursor: pointer;
+	margin-right: 2px;
 }
 .gitee-sync-plus-panel-item-status {
 	flex: 0 0 auto;

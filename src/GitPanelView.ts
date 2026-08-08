@@ -259,12 +259,12 @@ export class GitPanelView extends ItemView {
 		}
 
 		if (stagedItems.length > 0) {
-			this.renderGroup(l.panelGroupStaged, stagedItems, {
+			this.renderGroup(l.panelGroupStaged, stagedItems, "staged", {
 				unstageAll: () => this.onUnstageAll(),
 			});
 		}
 		if (unstagedItems.length > 0) {
-			this.renderGroup(l.panelGroupUnstaged, unstagedItems, {
+			this.renderGroup(l.panelGroupUnstaged, unstagedItems, "unstaged", {
 				stageAll: () => this.onStageAll(),
 				discardAll: () => this.onDiscardAll(),
 			});
@@ -277,6 +277,7 @@ export class GitPanelView extends ItemView {
 	private renderGroup(
 		title: string,
 		items: PanelItem[],
+		mode?: "staged" | "unstaged",
 		actions?: { stageAll?: () => void; unstageAll?: () => void; discardAll?: () => void }
 	): void {
 		const l = messages();
@@ -297,7 +298,7 @@ export class GitPanelView extends ItemView {
 		}
 		if (actions?.unstageAll) {
 			const btn = headerBtns.createEl("button", {
-				text: "−",
+				text: "-",
 				cls: "gitee-sync-plus-panel-icon-btn",
 				title: l.panelUnstageAllHint,
 			});
@@ -322,17 +323,27 @@ export class GitPanelView extends ItemView {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
 			row.setAttr("title", l.panelClickToDiff);
 
-			const staged = this.staged.has(item.path);
-			const checkbox = row.createEl("input", {
-				type: "checkbox",
-				cls: "gitee-sync-plus-panel-checkbox",
-			});
-			checkbox.checked = staged;
-			checkbox.title = staged ? l.panelUnstage : l.panelStage;
-			checkbox.addEventListener("click", (e) => {
-				e.stopPropagation();
-				this.toggleStage(item.path, checkbox.checked);
-			});
+			if (mode === "unstaged") {
+				const btn = row.createEl("button", {
+					text: "+",
+					cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action gitee-sync-plus-panel-stage-btn",
+					title: l.panelStage,
+				});
+				btn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.toggleStage(item.path, true);
+				});
+			} else if (mode === "staged") {
+				const btn = row.createEl("button", {
+					text: "-",
+					cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action gitee-sync-plus-panel-stage-btn",
+					title: l.panelUnstage,
+				});
+				btn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.toggleStage(item.path, false);
+				});
+			}
 
 			row.createSpan({
 				text: item.tag,
