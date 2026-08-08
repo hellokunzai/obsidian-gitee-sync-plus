@@ -289,24 +289,25 @@ export class GitPanelView extends ItemView {
 		const headerBtns = header.createDiv("gitee-sync-plus-panel-group-actions");
 		if (actions?.stageAll) {
 			const btn = headerBtns.createEl("button", {
-				text: l.panelStageAll,
-				cls: "gitee-sync-plus-panel-mini-btn",
+				text: "+",
+				cls: "gitee-sync-plus-panel-icon-btn",
 				title: l.panelStageAllHint,
 			});
 			btn.addEventListener("click", actions.stageAll);
 		}
 		if (actions?.unstageAll) {
 			const btn = headerBtns.createEl("button", {
-				text: l.panelUnstageAll,
-				cls: "gitee-sync-plus-panel-mini-btn",
+				text: "−",
+				cls: "gitee-sync-plus-panel-icon-btn",
 				title: l.panelUnstageAllHint,
 			});
 			btn.addEventListener("click", actions.unstageAll);
 		}
 		if (actions?.discardAll) {
 			const btn = headerBtns.createEl("button", {
-				text: l.panelDiscardAll,
-				cls: "gitee-sync-plus-panel-mini-btn",
+				text: "↩",
+				cls: "gitee-sync-plus-panel-icon-btn",
+				title: l.panelDiscardAll,
 			});
 			btn.addEventListener("click", actions.discardAll);
 		}
@@ -340,8 +341,9 @@ export class GitPanelView extends ItemView {
 			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
 			if (item.discardable) {
 				const btn = row.createEl("button", {
-					text: l.panelDiscard,
-					cls: "gitee-sync-plus-panel-mini-btn",
+					text: "↩",
+					cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
+					title: l.panelDiscard,
 				});
 				btn.addEventListener("click", (e) => {
 					e.stopPropagation();
