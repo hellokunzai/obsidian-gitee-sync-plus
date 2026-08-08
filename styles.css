@@ -248,8 +248,8 @@
 	right: 2px;
 	top: 50%;
 	transform: translateY(-50%);
-	width: 22px;
-	height: 18px;
+	width: 28px;
+	height: 20px;
 	padding: 0;
 	line-height: 1;
 	font-size: 14px;
@@ -268,6 +268,7 @@
 	color: var(--text-accent);
 	border-color: var(--text-accent);
 	background: var(--background-modifier-hover);
+	opacity: 1;
 }
 
 /* Modal button row used by revert-chunk confirm */
