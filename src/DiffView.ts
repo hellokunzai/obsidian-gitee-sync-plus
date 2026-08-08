@@ -258,7 +258,7 @@ export class DiffView extends ItemView {
 			// Revert-chunk button on the first row of each diff chunk.
 			if (row.chunkIndex >= 0 && this.isFirstRowOfChunk(row, rows)) {
 				const revertBtn = rightNum.createEl("button", {
-					text: "↩",
+					text: "←",
 					title: l.diffRevertChunk,
 					cls: "gitee-sync-plus-diff-revert-btn",
 				});
