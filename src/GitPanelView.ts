@@ -328,6 +328,26 @@ export class GitPanelView extends ItemView {
 			});
 			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
 
+			const viewBtn = row.createEl("button", {
+				text: "👁",
+				cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
+				title: l.panelViewDiff,
+			});
+			viewBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.openDiff(item);
+			});
+			if (item.discardable) {
+				const btn = row.createEl("button", {
+					text: "↩",
+					cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
+					title: l.panelDiscard,
+				});
+				btn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.onDiscard(item.path);
+				});
+			}
 			if (mode === "unstaged") {
 				const btn = row.createEl("button", {
 					text: "+",
@@ -349,26 +369,6 @@ export class GitPanelView extends ItemView {
 					this.toggleStage(item.path, false);
 				});
 			}
-			if (item.discardable) {
-				const btn = row.createEl("button", {
-					text: "↩",
-					cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
-					title: l.panelDiscard,
-				});
-				btn.addEventListener("click", (e) => {
-					e.stopPropagation();
-					this.onDiscard(item.path);
-				});
-			}
-			const viewBtn = row.createEl("button", {
-				text: "👁",
-				cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
-				title: l.panelViewDiff,
-			});
-			viewBtn.addEventListener("click", (e) => {
-				e.stopPropagation();
-				this.openDiff(item);
-			});
 		}
 	}
 
