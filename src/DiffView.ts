@@ -30,8 +30,9 @@ interface DiffRow {
  */
 export class DiffView extends ItemView {
 	private viewState: DiffState | null = null;
-	private diffContentEl!: HTMLElement;
+	private diffContentEl: HTMLElement | null = null;
 	private busy = false;
+	private opened = false;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -62,7 +63,10 @@ export class DiffView extends ItemView {
 	async setState(state: DiffState, result: any): Promise<void> {
 		this.viewState = state;
 		await super.setState(state, result);
-		void this.loadDiff();
+		// onOpen() may run after setState(); only load once the DOM is ready.
+		if (this.opened) {
+			void this.loadDiff();
+		}
 	}
 
 	getState(): DiffState {
@@ -80,19 +84,25 @@ export class DiffView extends ItemView {
 		// Path label is updated once state is known.
 		header.createEl("span", { cls: "gitee-sync-plus-diff-path" });
 
+		this.opened = true;
 		if (this.viewState) {
 			void this.loadDiff();
 		}
 	}
 
 	private updateTitle(): void {
-		this.leaf.view.getDisplayText = () => this.getDisplayText();
 		const header = this.containerEl.querySelector(".gitee-sync-plus-diff-path");
 		if (header) header.setText(this.getDisplayText());
+		// Ask Obsidian to refresh the tab label; ignore if the API is unavailable.
+		try {
+			(this.leaf as unknown as { updateDisplayText?: () => void }).updateDisplayText?.();
+		} catch {
+			/* ignore */
+		}
 	}
 
 	private async loadDiff(): Promise<void> {
-		if (this.busy || !this.viewState) return;
+		if (this.busy || !this.viewState || !this.diffContentEl) return;
 		this.busy = true;
 		const l = messages();
 		this.diffContentEl.empty();
@@ -149,8 +159,9 @@ export class DiffView extends ItemView {
 			this.renderDiff(path, beforeText, afterText, beforeLabel, afterLabel);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
-			this.diffContentEl.empty();
-			this.diffContentEl.createEl("p", {
+			console.error("[gitee-sync-plus] diff load failed", e);
+			this.diffContentEl?.empty();
+			this.diffContentEl?.createEl("p", {
 				text: l.diffError(msg),
 				cls: "gitee-sync-plus-diff-error",
 			});
@@ -182,6 +193,7 @@ export class DiffView extends ItemView {
 		beforeLabel: string,
 		afterLabel: string
 	): void {
+		if (!this.diffContentEl) return;
 		this.diffContentEl.empty();
 		const l = messages();
 
