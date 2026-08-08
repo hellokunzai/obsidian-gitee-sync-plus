@@ -60,4 +60,4 @@ gh release create "$VERSION" main.js manifest.json --title "$VERSION" --notes "$
 
 echo ""
 echo "✅ $VERSION 发布完成。社区市场约 30 分钟内可见更新;BRAT 用户执行 'Check for updates' 即可获取。"
-echo "   提示: 本机 vault 如需立即更新,把 main.js manifest.json 拷入 .obsidian/plugins/gitee-sync/"
+echo "   提示: 本机 vault 如需立即更新,把 main.js manifest.json 拷入 .obsidian/plugins/gitee-sync-plus/"

@@ -4,7 +4,7 @@ import { formatDateTime, messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
 
 /** Diagnostic log note. Excluded from sync via .gitignore so it never travels between devices. */
-export const LOG_FILE = "_gitee-sync-log.md";
+export const LOG_FILE = "_gitee-sync-plus-log.md";
 
 export interface SyncSummary {
 	pushed: number;

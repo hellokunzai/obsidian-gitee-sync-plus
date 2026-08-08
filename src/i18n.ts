@@ -18,7 +18,7 @@ const en = {
 	previewFailed: (message: string) => `Preview failed: ${message}`,
 	previewFailedLog: (time: string, message: string) =>
 		`\n## Sync preview failed ${time}\n${message}\n`,
-	diagnosticLogTitle: "# Gitee Sync diagnostic log\n",
+	diagnosticLogTitle: "# Gitee Sync Plus diagnostic log\n",
 	summaryUpload: (count: number) => `uploaded ${count}`,
 	summaryDownload: (count: number) => `downloaded ${count}`,
 	summaryDeleteRemote: (count: number) => `deleted remote ${count}`,
@@ -67,7 +67,7 @@ const en = {
 		"Raw contents of .gitignore at the vault root. Edit the rules here; they take effect on the next sync. Changes are saved when the field loses focus.",
 	settingsDebugLog: "Diagnostic log",
 	settingsDebugLogDesc:
-		"Record each sync plan and result in _gitee-sync-log.md at the vault root. The log should be excluded from sync via .gitignore.",
+		"Record each sync plan and result in _gitee-sync-plus-log.md at the vault root. The log should be excluded from sync via .gitignore.",
 
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
@@ -121,7 +121,7 @@ const zh: typeof en = {
 		`删除远端 ${deletedRemote}（详见 ${file}）`,
 	previewFailed: (message) => `预演失败：${message}`,
 	previewFailedLog: (time, message) => `\n## 同步预演失败 ${time}\n${message}\n`,
-	diagnosticLogTitle: "# Gitee Sync 诊断日志\n",
+	diagnosticLogTitle: "# Gitee Sync Plus 诊断日志\n",
 	summaryUpload: (count) => `上传 ${count}`,
 	summaryDownload: (count) => `下载 ${count}`,
 	summaryDeleteRemote: (count) => `删除远端 ${count}`,
@@ -166,7 +166,7 @@ const zh: typeof en = {
 		"vault 根目录 .gitignore 的完整内容。在这里编辑规则，下次同步时生效。输入框失去焦点时自动保存。",
 	settingsDebugLog: "调试日志",
 	settingsDebugLogDesc:
-		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-log.md（建议通过 .gitignore 排除同步）。",
+		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-plus-log.md（建议通过 .gitignore 排除同步）。",
 
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",

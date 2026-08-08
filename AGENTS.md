@@ -1,6 +1,6 @@
 # Agent 指南(cc-obsidian-syn)
 
-本仓库是 Obsidian 插件 **Gitee Sync**(id: `gitee-sync`):把 vault 以文件粒度同步到 Gitee/GitHub 仓库。三方对比同步引擎在 `src/sync.ts`,平台后端在 `src/githost.ts`,构建产物 `main.js` 不入库。
+本仓库是 Obsidian 插件 **Gitee Sync Plus**(id: `gitee-sync-plus`):把 vault 以文件粒度同步到 Gitee/GitHub 仓库。三方对比同步引擎在 `src/sync.ts`,平台后端在 `src/githost.ts`,构建产物 `main.js` 不入库。
 
 ## 构建
 
@@ -9,7 +9,7 @@ npm install
 npm run build     # tsc --noEmit + esbuild → main.js
 ```
 
-改动后如需在本机 vault 验证:`cp main.js manifest.json <vault>/.obsidian/plugins/gitee-sync/`,重启 Obsidian。
+改动后如需在本机 vault 验证:`cp main.js manifest.json <vault>/.obsidian/plugins/gitee-sync-plus/`,重启 Obsidian。
 
 ## 发布新版本(社区市场 / BRAT 的更新来源)
 

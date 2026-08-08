@@ -1,10 +1,10 @@
-# Gitee Sync
+# Gitee Sync Plus
 
 [English](#english) | [中文](#中文)
 
 ## English
 
-Gitee Sync stores an Obsidian vault as ordinary files in a private **Gitee or GitHub repository**. It connects directly to the platform API, requires no server or local Git installation, and works on desktop, iOS, and Android.
+Gitee Sync Plus stores an Obsidian vault as ordinary files in a private **Gitee or GitHub repository**. It connects directly to the platform API, requires no server or local Git installation, and works on desktop, iOS, and Android.
 
 The sync engine uses Git blob hashes and a three-way comparison between the local vault, remote repository, and the last successful device-local baseline. It supports incremental two-way sync, deletion propagation, conflict resolution, dry-run previews, and diagnostic logs. When both sides modify the same file, the newer modification wins.
 
@@ -12,7 +12,7 @@ The plugin interface automatically follows Obsidian's language and currently sup
 
 ### Installation
 
-In Obsidian, open **Settings → Community plugins → Browse**, search for **Gitee Sync**, install it, and enable it.
+In Obsidian, open **Settings → Community plugins → Browse**, search for **Gitee Sync Plus**, install it, and enable it.
 
 For local development builds:
 
@@ -20,8 +20,8 @@ For local development builds:
 npm install
 npm run build
 
-mkdir -p "<vault>/.obsidian/plugins/gitee-sync"
-cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync/"
+mkdir -p "<vault>/.obsidian/plugins/gitee-sync-plus"
+cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 ```
 
 ### Repository and token
@@ -42,7 +42,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync/"
 | Automatic sync interval | Minutes between syncs; `0` disables automatic sync |
 | Sync on startup | Runs one sync when Obsidian opens |
 | Excluded folders | Comma-separated folder prefixes that are not synced |
-| Diagnostic log | Writes the sync plan and result to `_gitee-sync-log.md` |
+| Diagnostic log | Writes the sync plan and result to `_gitee-sync-plus-log.md` |
 
 Trigger sync from the ribbon icon, the **Sync now** command, the status bar, the timer, or startup sync. Use **Preview sync plan** to inspect planned actions without changing either side.
 
@@ -69,12 +69,12 @@ If a downloaded folder is visible but a file with a non-standard extension is no
 
 - The first sync of a large vault creates one commit per file and may be limited by platform API quotas.
 - Keep large attachments in an excluded folder. Individual files should preferably remain below 50 MB.
-- Tokens are stored in `.obsidian/plugins/gitee-sync/data.json`. Exclude this file when backing up the vault with other tools.
+- Tokens are stored in `.obsidian/plugins/gitee-sync-plus/data.json`. Exclude this file when backing up the vault with other tools.
 - Do not manually push the same vault to the same repository while the plugin manages it.
 
 ## 中文
 
-Gitee Sync 将 Obsidian vault 中的笔记以普通文件形式保存到私有 **Gitee 或 GitHub 仓库**。插件直接连接平台 API，无需服务器或本地安装 Git，并支持桌面端、iOS 和 Android。
+Gitee Sync Plus 将 Obsidian vault 中的笔记以普通文件形式保存到私有 **Gitee 或 GitHub 仓库**。插件直接连接平台 API，无需服务器或本地安装 Git，并支持桌面端、iOS 和 Android。
 
 同步引擎使用 Git blob 内容哈希，对本地 vault、远端仓库和每台设备上次成功同步的基线进行三方比较。支持双向增量同步、删除同步、冲突处理、同步预演和诊断日志。两端同时修改同一文件时，保留修改时间较新的版本。
 
@@ -82,7 +82,7 @@ Gitee Sync 将 Obsidian vault 中的笔记以普通文件形式保存到私有 *
 
 ### 安装
 
-在 Obsidian 中打开 **设置 → 第三方插件 → 浏览**，搜索 **Gitee Sync**，安装并启用插件。
+在 Obsidian 中打开 **设置 → 第三方插件 → 浏览**，搜索 **Gitee Sync Plus**，安装并启用插件。
 
 本地开发版本可手动构建安装：
 
@@ -90,8 +90,8 @@ Gitee Sync 将 Obsidian vault 中的笔记以普通文件形式保存到私有 *
 npm install
 npm run build
 
-mkdir -p "<vault>/.obsidian/plugins/gitee-sync"
-cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync/"
+mkdir -p "<vault>/.obsidian/plugins/gitee-sync-plus"
+cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 ```
 
 ### 仓库和令牌
@@ -112,7 +112,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync/"
 | 自动同步间隔 | 同步间隔分钟数，`0` 表示关闭 |
 | 启动时同步 | Obsidian 打开后执行一次同步 |
 | 排除目录 | 逗号分隔、不参与同步的目录前缀 |
-| 调试日志 | 将同步计划和结果写入 `_gitee-sync-log.md` |
+| 调试日志 | 将同步计划和结果写入 `_gitee-sync-plus-log.md` |
 
 可通过侧边栏同步图标、命令面板中的 **立即同步**、状态栏、定时器或启动时同步触发。使用 **预览同步计划** 可以在不修改两端文件的情况下检查计划动作。
 
@@ -139,5 +139,5 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync/"
 
 - 大型 vault 首次同步会逐文件生成 commit，可能受到平台 API 限流影响。
 - 建议将大附件放入排除目录，单文件尽量保持在 50 MB 以下。
-- 令牌存放在 `.obsidian/plugins/gitee-sync/data.json`，使用其他工具备份 vault 时请排除此文件。
+- 令牌存放在 `.obsidian/plugins/gitee-sync-plus/data.json`，使用其他工具备份 vault 时请排除此文件。
 - 插件管理仓库后，不要同时把同一个 vault 手动推送到相同仓库。

@@ -3,31 +3,26 @@ import ignore from "ignore";
 
 const GITIGNORE_FILE = ".gitignore";
 
-const MANAGED_START = "# >>> gitee-sync managed exclusions >>>";
-const MANAGED_END = "# <<< gitee-sync managed exclusions <<<";
+const MANAGED_START = "# >>> gitee-sync-plus managed exclusions >>>";
+const MANAGED_END = "# <<< gitee-sync-plus managed exclusions <<<";
 
 /**
  * Default .gitignore created when none exists.
  * These rules live in a user-editable file rather than being hardcoded in the plugin.
  */
 const DEFAULT_GITIGNORE = [
-	"# Git internal data — must never be synced",
+	"# Git internal version control data, must never be synced",
 	".git",
-	".git/",
 	"",
 	"# Plugin diagnostic log",
-	"_gitee-sync-log.md",
+	"_gitee-sync-plus-log.md",
 	"",
-	"# Obsidian trash",
+	"# Obsidian trash directory",
 	".trash",
-	".trash/",
 	"",
-	"# Device-specific workspace state — syncing would overwrite layout on other devices",
+	"# Obsidian workspace layout files, stores panel and tab states. Do not sync across different devices",
 	".obsidian/workspace.json",
 	".obsidian/workspace-mobile.json",
-	"/.obsidian/workspace.json",
-	"/.obsidian/workspace-mobile.json",
-	"",
 ].join("\n");
 
 /**
@@ -128,7 +123,7 @@ export class GitIgnoreManager {
 
 		const managedBlock = [
 			MANAGED_START,
-			"# The following entries are managed by the Gitee Sync plugin settings.",
+			"# The following entries are managed by the Gitee Sync Plus plugin settings.",
 			...folders.map((f) => `${f}/`),
 			MANAGED_END,
 		].join("\n");

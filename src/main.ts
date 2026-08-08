@@ -20,7 +20,7 @@ interface PluginData {
 
 // This must not live in data.json: the vault (and therefore data.json) may be
 // synced by iCloud between devices, but the three-way merge base is device-local.
-const LOCAL_SYNC_STATE_KEY = "gitee-sync-sync-state-v1";
+const LOCAL_SYNC_STATE_KEY = "gitee-sync-plus-sync-state-v1";
 
 export default class CloudSyncPlugin extends Plugin {
 	settings: SyncSettings = { ...DEFAULT_SETTINGS };
@@ -119,7 +119,7 @@ export default class CloudSyncPlugin extends Plugin {
 			const msg = e instanceof Error ? e.message : String(e);
 			this.setStatus(l.statusFailed);
 			new Notice(l.syncFailed(msg), 8000);
-			console.error("[gitee-sync]", e);
+			console.error("[gitee-sync-plus]", e);
 		} finally {
 			this.syncing = false;
 		}
