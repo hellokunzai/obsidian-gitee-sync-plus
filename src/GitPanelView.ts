@@ -1,4 +1,4 @@
-import { App, ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
+import { App, ItemView, Modal, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { messages } from "./i18n";
 import { SyncEngine, SyncPlan } from "./sync";
@@ -329,10 +329,10 @@ export class GitPanelView extends ItemView {
 			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
 
 			const viewBtn = row.createEl("button", {
-				text: "👁",
 				cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
 				title: l.panelViewDiff,
 			});
+			setIcon(viewBtn, "file-text");
 			viewBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
 				this.openDiff(item);

@@ -132,6 +132,10 @@
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
+.gitee-sync-plus-panel-icon-btn svg {
+	width: 15px;
+	height: 15px;
+}
 /* Per-file actions (e.g. discard) are hidden until the row is hovered, like VS Code. */
 .gitee-sync-plus-panel-item-action {
 	opacity: 0;
