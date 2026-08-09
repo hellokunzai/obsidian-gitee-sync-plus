@@ -34,6 +34,10 @@ export default class CloudSyncPlugin extends Plugin {
 	private syncing = false;
 	private autoSyncTimer: number | null = null;
 
+	/** Ribbon icon references so they can be dynamically shown/hidden. */
+	private syncRibbonIcon?: HTMLElement;
+	private panelRibbonIcon?: HTMLElement;
+
 	async onload(): Promise<void> {
 		await this.loadPluginData();
 		const l = messages();
@@ -50,7 +54,6 @@ export default class CloudSyncPlugin extends Plugin {
 		this.statusBar.addEventListener("click", () => void this.runSync());
 		this.setStatus(l.statusIdle);
 
-		this.addRibbonIcon("refresh-cw", l.ribbonSync, () => void this.runSync());
 		this.addCommand({
 			id: "sync-now",
 			name: l.commandSyncNow,
@@ -62,9 +65,15 @@ export default class CloudSyncPlugin extends Plugin {
 			callback: () => void this.runPreview(),
 		});
 
+		if (this.settings.showSyncRibbon) {
+			this.syncRibbonIcon = this.addRibbonIcon("refresh-cw", l.ribbonSync, () => void this.runSync());
+		}
+
 		this.registerView(GIT_PANEL_VIEW_TYPE, (leaf) => new GitPanelView(leaf, this));
 		this.registerView(DIFF_VIEW_TYPE, (leaf) => new DiffView(leaf));
-		this.addRibbonIcon("git-pull-request-arrow", l.panelRibbon, () => void this.activateGitPanel());
+		if (this.settings.showPanelRibbon) {
+			this.panelRibbonIcon = this.addRibbonIcon("git-pull-request-arrow", l.panelRibbon, () => void this.activateGitPanel());
+		}
 		this.addCommand({
 			id: "open-git-panel",
 			name: l.panelOpenCommand,
@@ -107,6 +116,25 @@ export default class CloudSyncPlugin extends Plugin {
 		if (this.autoSyncTimer !== null) {
 			window.clearInterval(this.autoSyncTimer);
 			this.autoSyncTimer = null;
+		}
+	}
+
+	/** Show or hide ribbon icons based on current settings. Called when settings change. */
+	updateRibbonIcons(): void {
+		const l = messages();
+		// Sync ribbon
+		if (this.settings.showSyncRibbon && !this.syncRibbonIcon) {
+			this.syncRibbonIcon = this.addRibbonIcon("refresh-cw", l.ribbonSync, () => void this.runSync());
+		} else if (!this.settings.showSyncRibbon && this.syncRibbonIcon) {
+			this.syncRibbonIcon.remove();
+			this.syncRibbonIcon = undefined;
+		}
+		// Panel ribbon
+		if (this.settings.showPanelRibbon && !this.panelRibbonIcon) {
+			this.panelRibbonIcon = this.addRibbonIcon("git-pull-request-arrow", l.panelRibbon, () => void this.activateGitPanel());
+		} else if (!this.settings.showPanelRibbon && this.panelRibbonIcon) {
+			this.panelRibbonIcon.remove();
+			this.panelRibbonIcon = undefined;
 		}
 	}
 

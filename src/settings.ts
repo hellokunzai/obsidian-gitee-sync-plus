@@ -56,6 +56,8 @@ export interface SyncSettings {
 	excludeFolders?: string;
 	debugLog: boolean;
 	commitMode: CommitMode;
+	showSyncRibbon: boolean;
+	showPanelRibbon: boolean;
 }
 
 export const DEFAULT_SETTINGS: SyncSettings = {
@@ -72,6 +74,8 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	syncOnStart: false,
 	debugLog: false,
 	commitMode: "per-file",
+	showSyncRibbon: true,
+	showPanelRibbon: true,
 };
 
 export class SyncSettingTab extends PluginSettingTab {
@@ -252,6 +256,28 @@ export class SyncSettingTab extends PluginSettingTab {
 						s.commitMode = v as CommitMode;
 						await save();
 					})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsShowSyncRibbon)
+			.setDesc(l.settingsShowSyncRibbonDesc)
+			.addToggle((t) =>
+				t.setValue(s.showSyncRibbon).onChange(async (v) => {
+					s.showSyncRibbon = v;
+					await save();
+					this.plugin.updateRibbonIcons();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsShowPanelRibbon)
+			.setDesc(l.settingsShowPanelRibbonDesc)
+			.addToggle((t) =>
+				t.setValue(s.showPanelRibbon).onChange(async (v) => {
+					s.showPanelRibbon = v;
+					await save();
+					this.plugin.updateRibbonIcons();
+				})
 			);
 	}
 

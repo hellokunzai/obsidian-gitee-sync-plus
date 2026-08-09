@@ -77,6 +77,10 @@ const en = {
 		"Choose whether each file gets its own commit or all changes are combined into a single commit.",
 	optionPerFile: "One commit per file",
 	optionBatch: "One commit for all changes (batch)",
+	settingsShowSyncRibbon: "Show sync button in sidebar ribbon",
+	settingsShowSyncRibbonDesc: "When enabled, a sync button appears in the left sidebar ribbon for quick access.",
+	settingsShowPanelRibbon: "Show Git panel button in sidebar ribbon",
+	settingsShowPanelRibbonDesc: "When enabled, a Git panel button appears in the left sidebar ribbon.",
 
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
@@ -250,6 +254,10 @@ const zh: typeof en = {
 	settingsCommitModeDesc: "选择每个文件单独提交一次，还是将所有变更合并为一次提交。",
 	optionPerFile: "每文件单独提交",
 	optionBatch: "合并为一次提交（批量）",
+	settingsShowSyncRibbon: "在侧边栏显示同步按钮",
+	settingsShowSyncRibbonDesc: "开启后，左侧边栏将显示同步按钮，方便快速触发同步。",
+	settingsShowPanelRibbon: "在侧边栏显示 Git 面板按钮",
+	settingsShowPanelRibbonDesc: "开启后，左侧边栏将显示 Git 面板按钮，可快速打开 Git 面板。",
 
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",
