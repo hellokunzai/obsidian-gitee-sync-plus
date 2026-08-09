@@ -1,6 +1,22 @@
 .gitee-sync-plus-gitignore-editor {
-	width: 100%;
+	width: 75% !important;
+	min-width: 400px;
 	font-family: monospace;
+}
+
+/* ===== Settings tab section headers ===== */
+.gitee-sync-plus-section-header {
+	padding: 18px 0 6px !important;
+	margin-top: 4px !important;
+	background: none !important;
+	border: none !important;
+	box-shadow: none !important;
+	border-radius: 0 !important;
+}
+.gitee-sync-plus-section-header .setting-item-name {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	color: var(--text-normal);
 }
 
 /* ===== Git panel (sidebar) ===== */

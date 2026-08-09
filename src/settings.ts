@@ -91,6 +91,9 @@ export class SyncSettingTab extends PluginSettingTab {
 		const save = () => this.plugin.savePluginData();
 		const gitignoreContent = await this.plugin.gitIgnoreManager.readFullContent();
 
+		// ── 仓库设置 ──────────────────────────────────────
+		this.createSectionHeader(containerEl, l.sectionRepo);
+
 		new Setting(containerEl)
 			.setName(l.settingsBackend)
 			.setDesc(l.settingsBackendDesc)
@@ -201,16 +204,18 @@ export class SyncSettingTab extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
-			.setName(l.settingsAutoSync)
-			.setDesc(l.settingsAutoSyncDesc)
-			.addText((t) =>
-				t.setValue(String(s.autoSyncMinutes)).onChange(async (v) => {
-					const n = Number(v);
-					s.autoSyncMinutes = Number.isFinite(n) && n > 0 ? n : 0;
+			.setName(l.settingsShowSyncRibbon)
+			.setDesc(l.settingsShowSyncRibbonDesc)
+			.addToggle((t) =>
+				t.setValue(s.showSyncRibbon).onChange(async (v) => {
+					s.showSyncRibbon = v;
 					await save();
-					this.plugin.setupAutoSync();
+					this.plugin.updateRibbonIcons();
 				})
 			);
+
+		// ── 自动同步 ──────────────────────────────────────
+		this.createSectionHeader(containerEl, l.sectionAutoSync);
 
 		new Setting(containerEl)
 			.setName(l.settingsSyncOnStart)
@@ -218,28 +223,6 @@ export class SyncSettingTab extends PluginSettingTab {
 			.addToggle((t) =>
 				t.setValue(s.syncOnStart).onChange(async (v) => {
 					s.syncOnStart = v;
-					await save();
-				})
-			);
-
-		new Setting(containerEl)
-			.setName(l.settingsExcludeFolders)
-			.setDesc(l.settingsExcludeFoldersDesc)
-			.addTextArea((t) => {
-				t.setValue(gitignoreContent);
-				t.inputEl.rows = 12;
-				t.inputEl.addClass('gitee-sync-plus-gitignore-editor');
-				t.inputEl.addEventListener("blur", async () => {
-					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
-				});
-			});
-
-		new Setting(containerEl)
-			.setName(l.settingsDebugLog)
-			.setDesc(l.settingsDebugLogDesc)
-			.addToggle((t) =>
-				t.setValue(s.debugLog).onChange(async (v) => {
-					s.debugLog = v;
 					await save();
 				})
 			);
@@ -259,15 +242,19 @@ export class SyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(l.settingsShowSyncRibbon)
-			.setDesc(l.settingsShowSyncRibbonDesc)
-			.addToggle((t) =>
-				t.setValue(s.showSyncRibbon).onChange(async (v) => {
-					s.showSyncRibbon = v;
+			.setName(l.settingsAutoSync)
+			.setDesc(l.settingsAutoSyncDesc)
+			.addText((t) =>
+				t.setValue(String(s.autoSyncMinutes)).onChange(async (v) => {
+					const n = Number(v);
+					s.autoSyncMinutes = Number.isFinite(n) && n > 0 ? n : 0;
 					await save();
-					this.plugin.updateRibbonIcons();
+					this.plugin.setupAutoSync();
 				})
 			);
+
+		// ── 高级设置 ──────────────────────────────────────
+		this.createSectionHeader(containerEl, l.sectionAdvanced);
 
 		new Setting(containerEl)
 			.setName(l.settingsShowPanelRibbon)
@@ -279,6 +266,36 @@ export class SyncSettingTab extends PluginSettingTab {
 					this.plugin.updateRibbonIcons();
 				})
 			);
+
+		new Setting(containerEl)
+			.setName(l.settingsDebugLog)
+			.setDesc(l.settingsDebugLogDesc)
+			.addToggle((t) =>
+				t.setValue(s.debugLog).onChange(async (v) => {
+					s.debugLog = v;
+					await save();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsExcludeFolders)
+			.setDesc(l.settingsExcludeFoldersDesc)
+			.addTextArea((t) => {
+				t.setValue(gitignoreContent);
+				t.inputEl.rows = 12;
+				t.inputEl.addClass('gitee-sync-plus-gitignore-editor');
+				t.inputEl.addEventListener("blur", async () => {
+					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
+				});
+			});
+	}
+
+	private createSectionHeader(containerEl: HTMLElement, title: string): void {
+		const header = containerEl.createDiv({ cls: "setting-item" });
+		header.addClass("gitee-sync-plus-section-header");
+		const nameEl = header.createDiv({ cls: "setting-item-name" });
+		nameEl.setText(title);
+		const descEl = header.createDiv({ cls: "setting-item-description" });
 	}
 
 	private async renderBranchSetting(

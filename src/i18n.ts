@@ -82,6 +82,10 @@ const en = {
 	settingsShowPanelRibbon: "Show Git panel button in sidebar ribbon",
 	settingsShowPanelRibbonDesc: "When enabled, a Git panel button appears in the left sidebar ribbon.",
 
+	sectionRepo: "Repository settings",
+	sectionAutoSync: "Auto sync",
+	sectionAdvanced: "Advanced",
+
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
 	pathFailed: (path: string, message: string) => `Failed to process \"${path}\": ${message}`,
@@ -252,12 +256,16 @@ const zh: typeof en = {
 		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-plus-log.md（建议通过 .gitignore 排除同步）。",
 	settingsCommitMode: "提交模式",
 	settingsCommitModeDesc: "选择每个文件单独提交一次，还是将所有变更合并为一次提交。",
-	optionPerFile: "每文件单独提交",
+	optionPerFile: "每个文件单独提交",
 	optionBatch: "合并为一次提交（批量）",
 	settingsShowSyncRibbon: "在侧边栏显示同步按钮",
 	settingsShowSyncRibbonDesc: "开启后，左侧边栏将显示同步按钮，方便快速触发同步。",
 	settingsShowPanelRibbon: "在侧边栏显示 Git 面板按钮",
 	settingsShowPanelRibbonDesc: "开启后，左侧边栏将显示 Git 面板按钮，可快速打开 Git 面板。",
+
+	sectionRepo: "仓库设置",
+	sectionAutoSync: "自动同步",
+	sectionAdvanced: "高级设置",
 
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",
