@@ -177,6 +177,7 @@
 	gap: 6px;
 	flex: 0 0 auto;
 }
+.gitee-sync-plus-diff-action-btn,
 .gitee-sync-plus-diff-layout-btn {
 	display: inline-flex;
 	align-items: center;
@@ -193,10 +194,17 @@
 	cursor: pointer;
 	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
+.gitee-sync-plus-diff-action-btn:hover,
 .gitee-sync-plus-diff-layout-btn:hover {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 	border-color: var(--background-modifier-border-hover);
+}
+.gitee-sync-plus-diff-action-btn.is-active,
+.gitee-sync-plus-diff-layout-btn.is-active {
+	background: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+	border-color: var(--text-accent);
 }
 .gitee-sync-plus-diff-content {
 	flex: 1;
@@ -298,6 +306,44 @@
 .gitee-sync-plus-diff-error {
 	color: var(--text-error);
 	padding: 12px;
+}
+
+/* Collapse unchanged fragments: hide the middle of long equal runs */
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-body .gitee-sync-plus-diff-collapsible {
+	display: none;
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-placeholder {
+	display: table-row;
+	cursor: pointer;
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-placeholder .gitee-sync-plus-diff-num {
+	color: var(--text-accent);
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-placeholder .gitee-sync-plus-diff-cell {
+	color: var(--text-muted);
+	font-style: italic;
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-placeholder:hover {
+	background: var(--background-modifier-hover);
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-body.is-expanded .gitee-sync-plus-diff-collapsed-placeholder {
+	display: none;
+}
+.collapse-unchanged .gitee-sync-plus-diff-collapsed-body.is-expanded .gitee-sync-plus-diff-collapsible {
+	display: table-row;
+}
+
+/* Hide collapsed placeholder when not in collapse mode */
+.gitee-sync-plus-diff-collapsed-placeholder {
+	display: none;
+}
+
+/* Sync-scroll indicator for section scrollers (subtle active border) */
+.gitee-sync-plus-diff-section-scroll {
+	scrollbar-gutter: stable;
+}
+.gitee-sync-plus-diff-content.sync-scroll-active .gitee-sync-plus-diff-section-scroll {
+	border-color: var(--text-accent);
 }
 
 /* Revert-chunk button inside the right gutter cell */

@@ -39,6 +39,10 @@ export class DiffView extends ItemView {
 	private currentBeforeText = "";
 	private currentAfterText = "";
 	private layout: "side-by-side" | "vertical" = "side-by-side";
+	private collapseUnchanged = false;
+	private syncScroll = false;
+	private scrollSyncHandler?: () => void;
+	private sectionScrollEls: HTMLElement[] = [];
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -92,7 +96,22 @@ export class DiffView extends ItemView {
 			title: messages().diffLayoutToggle,
 		});
 		layoutBtn.addEventListener("click", () => this.toggleLayout());
+
+		const collapseBtn = actions.createEl("button", {
+			cls: "gitee-sync-plus-diff-action-btn gitee-sync-plus-diff-collapse-btn",
+			title: messages().diffCollapseUnchanged,
+		});
+		collapseBtn.addEventListener("click", () => this.toggleCollapseUnchanged());
+
+		const syncBtn = actions.createEl("button", {
+			cls: "gitee-sync-plus-diff-action-btn gitee-sync-plus-diff-sync-btn",
+			title: messages().diffSyncScroll,
+		});
+		syncBtn.addEventListener("click", () => this.toggleSyncScroll());
+
 		this.updateLayoutButton();
+		this.updateCollapseButton();
+		this.updateSyncButton();
 
 		this.diffContentEl = container.createDiv("gitee-sync-plus-diff-content");
 
@@ -119,6 +138,82 @@ export class DiffView extends ItemView {
 		btn.setAttribute("aria-label", title);
 		btn.setAttribute("title", title);
 		btn.setText(this.layout === "side-by-side" ? "⇅" : "⇄");
+	}
+
+	private toggleCollapseUnchanged(): void {
+		this.collapseUnchanged = !this.collapseUnchanged;
+		this.updateCollapseButton();
+		if (this.diffContentEl) {
+			this.diffContentEl.toggleClass("collapse-unchanged", this.collapseUnchanged);
+		}
+	}
+
+	private updateCollapseButton(): void {
+		const btn = this.containerEl.querySelector(".gitee-sync-plus-diff-collapse-btn");
+		if (!btn) return;
+		const l = messages();
+		const title = this.collapseUnchanged ? l.diffExpandUnchanged : l.diffCollapseUnchanged;
+		btn.setAttribute("aria-label", title);
+		btn.setAttribute("title", title);
+		btn.setText(this.collapseUnchanged ? "≣" : "≡");
+		btn.toggleClass("is-active", this.collapseUnchanged);
+	}
+
+	private toggleSyncScroll(): void {
+		this.syncScroll = !this.syncScroll;
+		this.updateSyncButton();
+		if (this.syncScroll) {
+			this.attachScrollSync();
+		} else {
+			this.detachScrollSync();
+		}
+	}
+
+	private updateSyncButton(): void {
+		const btn = this.containerEl.querySelector(".gitee-sync-plus-diff-sync-btn");
+		if (!btn) return;
+		const l = messages();
+		const title = this.syncScroll ? l.diffSyncScrollOff : l.diffSyncScroll;
+		btn.setAttribute("aria-label", title);
+		btn.setAttribute("title", title);
+		btn.setText(this.syncScroll ? "⧓" : "⧒");
+		btn.toggleClass("is-active", this.syncScroll);
+	}
+
+	private attachScrollSync(): void {
+		this.detachScrollSync();
+		if (this.sectionScrollEls.length !== 2) return;
+		const [left, right] = this.sectionScrollEls;
+		let active: HTMLElement | null = null;
+		let timeout: number | undefined;
+		const onScroll = (source: HTMLElement) => {
+			if (active && active !== source) return;
+			active = source;
+			const target = source === left ? right : left;
+			const maxSource = source.scrollHeight - source.clientHeight;
+			const maxTarget = target.scrollHeight - target.clientHeight;
+			if (maxSource <= 0 || maxTarget <= 0) return;
+			const ratio = source.scrollTop / maxSource;
+			target.scrollTop = ratio * maxTarget;
+			if (timeout) window.clearTimeout(timeout);
+			timeout = window.setTimeout(() => {
+				active = null;
+			}, 100);
+		};
+		this.scrollSyncHandler = () => {
+			if (document.activeElement === left || left.matches(":hover")) onScroll(left);
+			else onScroll(right);
+		};
+		left.addEventListener("scroll", this.scrollSyncHandler);
+		right.addEventListener("scroll", this.scrollSyncHandler);
+	}
+
+	private detachScrollSync(): void {
+		if (!this.scrollSyncHandler || this.sectionScrollEls.length !== 2) return;
+		const [left, right] = this.sectionScrollEls;
+		left.removeEventListener("scroll", this.scrollSyncHandler);
+		right.removeEventListener("scroll", this.scrollSyncHandler);
+		this.scrollSyncHandler = undefined;
 	}
 
 	private updateTitle(): void {
@@ -263,10 +358,18 @@ export class DiffView extends ItemView {
 			if (row.newLine > 0) afterChunkFirstRows.set(row.newLine, row.chunkIndex);
 		}
 
+		this.sectionScrollEls = [];
+		this.detachScrollSync();
+
 		const wrapper = this.diffContentEl.createDiv("gitee-sync-plus-diff-files");
 
 		this.renderFileSection(wrapper, beforeLabel, beforeLines, beforeStates, beforeChunkFirstRows, "before");
 		this.renderFileSection(wrapper, afterLabel, afterLines, afterStates, afterChunkFirstRows, "after");
+
+		this.diffContentEl.toggleClass("collapse-unchanged", this.collapseUnchanged);
+		this.updateCollapseButton();
+		this.updateSyncButton();
+		if (this.syncScroll) this.attachScrollSync();
 	}
 
 	private renderFileSection(
@@ -284,9 +387,10 @@ export class DiffView extends ItemView {
 
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
 		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
-		const tbody = table.createEl("tbody");
+		this.sectionScrollEls.push(scrollBox);
 
 		if (lines.length === 0) {
+			const tbody = table.createEl("tbody");
 			const tr = tbody.createEl("tr", { cls: "gitee-sync-plus-diff-row state-empty" });
 			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
 			numCell.setText("-");
@@ -295,15 +399,18 @@ export class DiffView extends ItemView {
 			return;
 		}
 
-		for (let i = 0; i < lines.length; i++) {
-			const lineNumber = i + 1;
+		const renderRow = (index: number, parent: HTMLElement, collapsible = false): HTMLElement => {
+			const lineNumber = index + 1;
 			const state = lineStates.get(lineNumber) ?? "equal";
-			const tr = tbody.createEl("tr", { cls: `gitee-sync-plus-diff-row state-${state}` });
+			const cls = collapsible
+				? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible state-${state}`
+				: `gitee-sync-plus-diff-row state-${state}`;
+			const tr = parent.createEl("tr", { cls });
 
 			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
 			numCell.setText(String(lineNumber));
 			const textCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			textCell.setText(lines[i]);
+			textCell.setText(lines[index]);
 
 			const chunkIndex = chunkFirstRows.get(lineNumber);
 			if (chunkIndex !== undefined) {
@@ -316,6 +423,57 @@ export class DiffView extends ItemView {
 					evt.stopPropagation();
 					void this.onRevertChunk(chunkIndex);
 				});
+			}
+			return tr;
+		};
+
+		const segments: Array<{ type: "equal" | "diff"; start: number; end: number }> = [];
+		let i = 0;
+		while (i < lines.length) {
+			const start = i;
+			const firstState = lineStates.get(i + 1) ?? "equal";
+			if (firstState === "equal") {
+				while (i < lines.length && (lineStates.get(i + 1) ?? "equal") === "equal") i++;
+				segments.push({ type: "equal", start, end: i - 1 });
+			} else {
+				while (i < lines.length && (lineStates.get(i + 1) ?? "equal") !== "equal") i++;
+				segments.push({ type: "diff", start, end: i - 1 });
+			}
+		}
+
+		const CONTEXT_LINES = 2;
+		for (const seg of segments) {
+			const len = seg.end - seg.start + 1;
+			if (seg.type === "diff" || len <= CONTEXT_LINES * 2) {
+				const tbody = table.createEl("tbody");
+				for (let j = seg.start; j <= seg.end; j++) {
+					renderRow(j, tbody);
+				}
+				continue;
+			}
+
+			// Long equal segment: collapse the middle, keep context at both ends.
+			const group = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+			for (let j = seg.start; j < seg.start + CONTEXT_LINES; j++) {
+				renderRow(j, group);
+			}
+
+			const hiddenCount = len - CONTEXT_LINES * 2;
+			const placeholder = group.createEl("tr", {
+				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+			});
+			const placeholderNum = placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+			placeholderNum.setText("⋯");
+			const placeholderCell = placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+			placeholderCell.setText(l.diffUnchangedLines(hiddenCount));
+			placeholder.addEventListener("click", () => group.toggleClass("is-expanded", true));
+
+			for (let j = seg.start + CONTEXT_LINES; j <= seg.end - CONTEXT_LINES; j++) {
+				renderRow(j, group, true);
+			}
+
+			for (let j = seg.end - CONTEXT_LINES + 1; j <= seg.end; j++) {
+				renderRow(j, group);
 			}
 		}
 	}
