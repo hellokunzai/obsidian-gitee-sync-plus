@@ -40,9 +40,15 @@ export class DiffView extends ItemView {
 	private currentAfterText = "";
 	private layout: "side-by-side" | "vertical" = "side-by-side";
 	private collapseUnchanged = false;
-	private syncScroll = false;
 	private scrollSyncHandler?: () => void;
 	private sectionScrollEls: HTMLElement[] = [];
+	private lastDiff: {
+		path: string;
+		beforeText: string;
+		afterText: string;
+		beforeLabel: string;
+		afterLabel: string;
+	} | null = null;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -103,15 +109,8 @@ export class DiffView extends ItemView {
 		});
 		collapseBtn.addEventListener("click", () => this.toggleCollapseUnchanged());
 
-		const syncBtn = actions.createEl("button", {
-			cls: "gitee-sync-plus-diff-action-btn gitee-sync-plus-diff-sync-btn",
-			title: messages().diffSyncScroll,
-		});
-		syncBtn.addEventListener("click", () => this.toggleSyncScroll());
-
 		this.updateLayoutButton();
 		this.updateCollapseButton();
-		this.updateSyncButton();
 
 		this.diffContentEl = container.createDiv("gitee-sync-plus-diff-content");
 
@@ -124,7 +123,16 @@ export class DiffView extends ItemView {
 	private toggleLayout(): void {
 		this.layout = this.layout === "side-by-side" ? "vertical" : "side-by-side";
 		this.updateLayoutButton();
-		if (this.diffContentEl) {
+		// DOM structure differs between layouts, so re-render instead of just swapping a class.
+		if (this.lastDiff) {
+			this.renderDiff(
+				this.lastDiff.path,
+				this.lastDiff.beforeText,
+				this.lastDiff.afterText,
+				this.lastDiff.beforeLabel,
+				this.lastDiff.afterLabel
+			);
+		} else if (this.diffContentEl) {
 			this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
 			this.diffContentEl.addClass(`layout-${this.layout}`);
 		}
@@ -157,27 +165,6 @@ export class DiffView extends ItemView {
 		btn.setAttribute("title", title);
 		btn.setText(this.collapseUnchanged ? "≣" : "≡");
 		btn.toggleClass("is-active", this.collapseUnchanged);
-	}
-
-	private toggleSyncScroll(): void {
-		this.syncScroll = !this.syncScroll;
-		this.updateSyncButton();
-		if (this.syncScroll) {
-			this.attachScrollSync();
-		} else {
-			this.detachScrollSync();
-		}
-	}
-
-	private updateSyncButton(): void {
-		const btn = this.containerEl.querySelector(".gitee-sync-plus-diff-sync-btn");
-		if (!btn) return;
-		const l = messages();
-		const title = this.syncScroll ? l.diffSyncScrollOff : l.diffSyncScroll;
-		btn.setAttribute("aria-label", title);
-		btn.setAttribute("title", title);
-		btn.setText(this.syncScroll ? "⧓" : "⧒");
-		btn.toggleClass("is-active", this.syncScroll);
 	}
 
 	private attachScrollSync(): void {
@@ -332,90 +319,123 @@ export class DiffView extends ItemView {
 		this.currentRows = rows;
 		this.currentBeforeText = beforeText;
 		this.currentAfterText = afterText;
+		this.lastDiff = { path, beforeText, afterText, beforeLabel, afterLabel };
 
 		this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
 		this.diffContentEl.addClass(`layout-${this.layout}`);
 		this.updateLayoutButton();
-
-		// Map line numbers to their diff state for each side.
-		const beforeStates = new Map<number, "equal" | "delete" | "change">();
-		const afterStates = new Map<number, "equal" | "insert" | "change">();
-		for (const row of rows) {
-			if (row.oldLine > 0) {
-				beforeStates.set(row.oldLine, row.state === "delete" ? "delete" : row.state === "change" ? "change" : "equal");
-			}
-			if (row.newLine > 0) {
-				afterStates.set(row.newLine, row.state === "insert" ? "insert" : row.state === "change" ? "change" : "equal");
-			}
-		}
-
-		// Determine first rows of each chunk on each side so we can place revert buttons.
-		const beforeChunkFirstRows = new Map<number, number>();
-		const afterChunkFirstRows = new Map<number, number>();
-		for (const row of rows) {
-			if (row.chunkIndex < 0 || !this.isFirstRowOfChunk(row, rows)) continue;
-			if (row.oldLine > 0) beforeChunkFirstRows.set(row.oldLine, row.chunkIndex);
-			if (row.newLine > 0) afterChunkFirstRows.set(row.newLine, row.chunkIndex);
-		}
 
 		this.sectionScrollEls = [];
 		this.detachScrollSync();
 
 		const wrapper = this.diffContentEl.createDiv("gitee-sync-plus-diff-files");
 
-		this.renderFileSection(wrapper, beforeLabel, beforeLines, beforeStates, beforeChunkFirstRows, "before");
-		this.renderFileSection(wrapper, afterLabel, afterLines, afterStates, afterChunkFirstRows, "after");
+		if (this.layout === "side-by-side") {
+			this.renderSideBySide(wrapper, rows, beforeLabel, afterLabel);
+		} else {
+			this.renderVertical(wrapper, rows, beforeLabel, afterLabel);
+		}
 
 		this.diffContentEl.toggleClass("collapse-unchanged", this.collapseUnchanged);
 		this.updateCollapseButton();
-		this.updateSyncButton();
-		if (this.syncScroll) this.attachScrollSync();
+		// Sync scroll is always enabled for both side-by-side and vertical layouts.
+		this.attachScrollSync();
 	}
 
-	private renderFileSection(
+	private renderSideBySide(
 		wrapper: HTMLElement,
-		label: string,
-		lines: string[],
-		lineStates: Map<number, "equal" | "delete" | "change" | "insert">,
-		chunkFirstRows: Map<number, number>,
-		side: "before" | "after"
+		rows: DiffRow[],
+		beforeLabel: string,
+		afterLabel: string
 	): void {
-		const l = messages();
-		const section = wrapper.createDiv(`gitee-sync-plus-diff-section gitee-sync-plus-diff-section-${side}`);
-		const labelEl = section.createDiv("gitee-sync-plus-diff-section-label");
-		labelEl.setText(label);
+		const section = wrapper.createDiv("gitee-sync-plus-diff-section gitee-sync-plus-diff-section-wide");
+		const header = section.createDiv("gitee-sync-plus-diff-section-labels");
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: beforeLabel });
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: afterLabel });
 
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
-		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
+		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
 		this.sectionScrollEls.push(scrollBox);
 
-		if (lines.length === 0) {
+		const segments = this.buildRowSegments(rows);
+		for (const seg of segments) {
+			this.renderSideBySideSegment(table, seg, rows);
+		}
+	}
+
+	private renderSideBySideSegment(
+		table: HTMLElement,
+		seg: { type: "equal" | "diff"; start: number; end: number },
+		rows: DiffRow[]
+	): void {
+		const l = messages();
+		const CONTEXT_LINES = 2;
+		const len = seg.end - seg.start + 1;
+
+		if (seg.type === "diff" || len <= CONTEXT_LINES * 2) {
 			const tbody = table.createEl("tbody");
-			const tr = tbody.createEl("tr", { cls: "gitee-sync-plus-diff-row state-empty" });
-			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
-			numCell.setText("-");
-			const textCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			textCell.setText(l.diffLeftEmpty);
+			for (let i = seg.start; i <= seg.end; i++) {
+				this.renderSideBySideRow(tbody, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+			}
 			return;
 		}
 
-		const renderRow = (index: number, parent: HTMLElement, collapsible = false): HTMLElement => {
-			const lineNumber = index + 1;
-			const state = lineStates.get(lineNumber) ?? "equal";
-			const cls = collapsible
-				? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible state-${state}`
-				: `gitee-sync-plus-diff-row state-${state}`;
-			const tr = parent.createEl("tr", { cls });
+		const group = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+		for (let i = seg.start; i < seg.start + CONTEXT_LINES; i++) {
+			this.renderSideBySideRow(group, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+		}
 
-			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
-			numCell.setText(String(lineNumber));
-			const textCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			textCell.setText(lines[index]);
+		const hiddenCount = len - CONTEXT_LINES * 2;
+		const placeholder = group.createEl("tr", {
+			cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+		});
+		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hiddenCount));
+		placeholder.addEventListener("click", () => group.toggleClass("is-expanded", true));
 
-			const chunkIndex = chunkFirstRows.get(lineNumber);
-			if (chunkIndex !== undefined) {
+		for (let i = seg.start + CONTEXT_LINES; i <= seg.end - CONTEXT_LINES; i++) {
+			this.renderSideBySideRow(group, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined, true);
+		}
+
+		for (let i = seg.end - CONTEXT_LINES + 1; i <= seg.end; i++) {
+			this.renderSideBySideRow(group, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+		}
+	}
+
+	private renderSideBySideRow(
+		parent: HTMLElement,
+		row: DiffRow,
+		chunkIndex: number | undefined,
+		collapsible = false
+	): void {
+		const l = messages();
+		const cls = collapsible
+			? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible state-${row.state}`
+			: `gitee-sync-plus-diff-row state-${row.state}`;
+		const tr = parent.createEl("tr", { cls });
+
+		const leftNum = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+		leftNum.setText(row.oldLine > 0 ? String(row.oldLine) : "");
+		const leftCell = tr.createEl("td", {
+			cls: `gitee-sync-plus-diff-cell ${row.oldLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`,
+		});
+		leftCell.setText(row.oldText);
+
+		const rightNum = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+		rightNum.setText(row.newLine > 0 ? String(row.newLine) : "");
+		const rightCell = tr.createEl("td", {
+			cls: `gitee-sync-plus-diff-cell ${row.newLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`,
+		});
+		rightCell.setText(row.newText);
+
+		if (chunkIndex !== undefined) {
+			// Place a revert button on whichever side actually shows content for this row:
+			// delete -> left (before), insert -> right (after), change -> both.
+			const attach = (numCell: HTMLElement) => {
 				const revertBtn = numCell.createEl("button", {
-					text: "←",
+					text: "↩",
 					title: l.diffRevertChunk,
 					cls: "gitee-sync-plus-diff-revert-btn",
 				});
@@ -423,59 +443,152 @@ export class DiffView extends ItemView {
 					evt.stopPropagation();
 					void this.onRevertChunk(chunkIndex);
 				});
-			}
-			return tr;
-		};
+			};
+			if (row.oldLine > 0) attach(leftNum);
+			if (row.newLine > 0) attach(rightNum);
+		}
+	}
 
+	private renderVertical(
+		wrapper: HTMLElement,
+		rows: DiffRow[],
+		beforeLabel: string,
+		afterLabel: string
+	): void {
+		const beforeSection = wrapper.createDiv("gitee-sync-plus-diff-section gitee-sync-plus-diff-section-before");
+		beforeSection.createDiv("gitee-sync-plus-diff-section-label").setText(beforeLabel);
+		const beforeScroll = beforeSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const beforeTable = beforeScroll.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
+		this.sectionScrollEls.push(beforeScroll);
+
+		const afterSection = wrapper.createDiv("gitee-sync-plus-diff-section gitee-sync-plus-diff-section-after");
+		afterSection.createDiv("gitee-sync-plus-diff-section-label").setText(afterLabel);
+		const afterScroll = afterSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const afterTable = afterScroll.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
+		this.sectionScrollEls.push(afterScroll);
+
+		const segments = this.buildRowSegments(rows);
+		for (const seg of segments) {
+			this.renderVerticalSegment(beforeTable, afterTable, seg, rows);
+		}
+	}
+
+	private renderVerticalSegment(
+		beforeTable: HTMLElement,
+		afterTable: HTMLElement,
+		seg: { type: "equal" | "diff"; start: number; end: number },
+		rows: DiffRow[]
+	): void {
+		const l = messages();
+		const CONTEXT_LINES = 2;
+		const len = seg.end - seg.start + 1;
+
+		if (seg.type === "diff" || len <= CONTEXT_LINES * 2) {
+			const beforeBody = beforeTable.createEl("tbody");
+			const afterBody = afterTable.createEl("tbody");
+			for (let i = seg.start; i <= seg.end; i++) {
+				this.renderVerticalRows(beforeBody, afterBody, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+			}
+			return;
+		}
+
+		const beforeGroup = beforeTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+		const afterGroup = afterTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+
+		for (let i = seg.start; i < seg.start + CONTEXT_LINES; i++) {
+			this.renderVerticalRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+		}
+
+		const hiddenCount = len - CONTEXT_LINES * 2;
+		const beforePlaceholder = beforeGroup.createEl("tr", {
+			cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+		});
+		beforePlaceholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+		beforePlaceholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+
+		const afterPlaceholder = afterGroup.createEl("tr", {
+			cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+		});
+		afterPlaceholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+		afterPlaceholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hiddenCount));
+
+		beforePlaceholder.addEventListener("click", () => {
+			beforeGroup.toggleClass("is-expanded", true);
+			afterGroup.toggleClass("is-expanded", true);
+		});
+		afterPlaceholder.addEventListener("click", () => {
+			beforeGroup.toggleClass("is-expanded", true);
+			afterGroup.toggleClass("is-expanded", true);
+		});
+
+		for (let i = seg.start + CONTEXT_LINES; i <= seg.end - CONTEXT_LINES; i++) {
+			this.renderVerticalRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined, true);
+		}
+
+		for (let i = seg.end - CONTEXT_LINES + 1; i <= seg.end; i++) {
+			this.renderVerticalRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+		}
+	}
+
+	private renderVerticalRows(
+		beforeBody: HTMLElement,
+		afterBody: HTMLElement,
+		row: DiffRow,
+		chunkIndex: number | undefined,
+		collapsible = false
+	): void {
+		const l = messages();
+		const beforeCls = collapsible
+			? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible ${row.oldLine > 0 ? `state-${row.state}` : "state-placeholder"}`
+			: `gitee-sync-plus-diff-row ${row.oldLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
+		const beforeTr = beforeBody.createEl("tr", { cls: beforeCls });
+		const beforeNum = beforeTr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+		beforeNum.setText(row.oldLine > 0 ? String(row.oldLine) : "");
+		beforeTr.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(row.oldLine > 0 ? row.oldText : "");
+
+		const afterCls = collapsible
+			? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible ${row.newLine > 0 ? `state-${row.state}` : "state-placeholder"}`
+			: `gitee-sync-plus-diff-row ${row.newLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
+		const afterTr = afterBody.createEl("tr", { cls: afterCls });
+		const afterNum = afterTr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+		afterNum.setText(row.newLine > 0 ? String(row.newLine) : "");
+		const afterCell = afterTr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+		afterCell.setText(row.newLine > 0 ? row.newText : "");
+
+		if (chunkIndex !== undefined) {
+			const attach = (numCell: HTMLElement) => {
+				const revertBtn = numCell.createEl("button", {
+					text: "↩",
+					title: l.diffRevertChunk,
+					cls: "gitee-sync-plus-diff-revert-btn",
+				});
+				revertBtn.addEventListener("click", (evt) => {
+					evt.stopPropagation();
+					void this.onRevertChunk(chunkIndex);
+				});
+			};
+			// Revert button on the side(s) that actually show content:
+			// delete -> before, insert -> after, change -> both.
+			if (row.oldLine > 0) attach(beforeNum);
+			if (row.newLine > 0) attach(afterNum);
+		}
+	}
+
+	private buildRowSegments(rows: DiffRow[]): Array<{ type: "equal" | "diff"; start: number; end: number }> {
 		const segments: Array<{ type: "equal" | "diff"; start: number; end: number }> = [];
 		let i = 0;
-		while (i < lines.length) {
+		while (i < rows.length) {
 			const start = i;
-			const firstState = lineStates.get(i + 1) ?? "equal";
-			if (firstState === "equal") {
-				while (i < lines.length && (lineStates.get(i + 1) ?? "equal") === "equal") i++;
+			const state = rows[i].state;
+			if (state === "equal") {
+				while (i < rows.length && rows[i].state === "equal") i++;
 				segments.push({ type: "equal", start, end: i - 1 });
 			} else {
-				while (i < lines.length && (lineStates.get(i + 1) ?? "equal") !== "equal") i++;
+				while (i < rows.length && rows[i].state !== "equal") i++;
 				segments.push({ type: "diff", start, end: i - 1 });
 			}
 		}
-
-		const CONTEXT_LINES = 2;
-		for (const seg of segments) {
-			const len = seg.end - seg.start + 1;
-			if (seg.type === "diff" || len <= CONTEXT_LINES * 2) {
-				const tbody = table.createEl("tbody");
-				for (let j = seg.start; j <= seg.end; j++) {
-					renderRow(j, tbody);
-				}
-				continue;
-			}
-
-			// Long equal segment: collapse the middle, keep context at both ends.
-			const group = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
-			for (let j = seg.start; j < seg.start + CONTEXT_LINES; j++) {
-				renderRow(j, group);
-			}
-
-			const hiddenCount = len - CONTEXT_LINES * 2;
-			const placeholder = group.createEl("tr", {
-				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
-			});
-			const placeholderNum = placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" });
-			placeholderNum.setText("⋯");
-			const placeholderCell = placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			placeholderCell.setText(l.diffUnchangedLines(hiddenCount));
-			placeholder.addEventListener("click", () => group.toggleClass("is-expanded", true));
-
-			for (let j = seg.start + CONTEXT_LINES; j <= seg.end - CONTEXT_LINES; j++) {
-				renderRow(j, group, true);
-			}
-
-			for (let j = seg.end - CONTEXT_LINES + 1; j <= seg.end; j++) {
-				renderRow(j, group);
-			}
-		}
+		return segments;
 	}
 
 	private isFirstRowOfChunk(row: DiffRow, rows: DiffRow[]): boolean {

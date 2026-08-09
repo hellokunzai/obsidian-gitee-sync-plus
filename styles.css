@@ -252,6 +252,28 @@
 	background: var(--background-secondary);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
+.gitee-sync-plus-diff-section-labels {
+	display: flex;
+	flex: 0 0 auto;
+	padding: 4px 8px;
+	font-size: 0.78em;
+	font-weight: 600;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-section-label-left,
+.gitee-sync-plus-diff-section-label-right {
+	flex: 1 1 50%;
+	padding: 0 6px;
+}
+.gitee-sync-plus-diff-section-wide {
+	width: 100%;
+	border-left: none !important;
+}
+.gitee-sync-plus-diff-section-wide .gitee-sync-plus-diff-section-scroll {
+	width: 100%;
+}
 .gitee-sync-plus-diff-section-scroll {
 	flex: 1;
 	overflow: auto;
@@ -267,6 +289,35 @@
 }
 .gitee-sync-plus-diff-section-table td {
 	vertical-align: top;
+}
+.gitee-sync-plus-diff-table {
+	width: 100%;
+	min-width: 100%;
+	border-collapse: collapse;
+	font-family: var(--font-monospace);
+	font-size: 0.82em;
+	line-height: 1.45;
+	table-layout: fixed;
+}
+.gitee-sync-plus-diff-table td {
+	vertical-align: top;
+}
+.gitee-sync-plus-diff-table .gitee-sync-plus-diff-num {
+	width: 36px;
+	min-width: 36px;
+	max-width: 36px;
+}
+.gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell {
+	width: 50%;
+}
+.gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell.gitee-sync-plus-diff-empty {
+	background: repeating-linear-gradient(
+		45deg,
+		var(--background-primary),
+		var(--background-primary) 8px,
+		var(--background-modifier-border-hover) 8px,
+		var(--background-modifier-border-hover) 16px
+	);
 }
 .gitee-sync-plus-diff-num {
 	width: 36px;
@@ -288,16 +339,29 @@
 .gitee-sync-plus-diff-row {
 	border-bottom: 1px solid var(--background-modifier-border-hover);
 }
+/* ===== Row coloring: delete=red, insert=green, change=orange ===== */
 .gitee-sync-plus-diff-row.state-equal .gitee-sync-plus-diff-cell {
 	background: var(--background-primary);
 }
-.gitee-sync-plus-diff-section-before .gitee-sync-plus-diff-row.state-delete .gitee-sync-plus-diff-cell,
-.gitee-sync-plus-diff-section-before .gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell {
+.gitee-sync-plus-diff-row.state-delete .gitee-sync-plus-diff-cell {
 	background: rgba(var(--color-red-rgb), 0.12);
 }
-.gitee-sync-plus-diff-section-after .gitee-sync-plus-diff-row.state-insert .gitee-sync-plus-diff-cell,
-.gitee-sync-plus-diff-section-after .gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell {
+.gitee-sync-plus-diff-row.state-insert .gitee-sync-plus-diff-cell {
 	background: rgba(var(--color-green-rgb), 0.12);
+}
+.gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell {
+	background: rgba(var(--color-orange-rgb), 0.12);
+}
+/* Placeholder rows used to keep both sides vertically aligned */
+.gitee-sync-plus-diff-row.state-placeholder .gitee-sync-plus-diff-cell {
+	background: var(--background-primary);
+}
+.gitee-sync-plus-diff-row.state-placeholder {
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+.gitee-sync-plus-diff-row.state-placeholder .gitee-sync-plus-diff-num {
+	color: var(--text-faint);
+	background: var(--background-secondary);
 }
 .gitee-sync-plus-diff-row.state-empty .gitee-sync-plus-diff-cell {
 	color: var(--text-faint);
