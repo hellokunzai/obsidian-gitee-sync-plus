@@ -3,7 +3,7 @@ import { GitIgnoreManager } from "./gitignore";
 import { formatDateTime, formatTime, messages } from "./i18n";
 import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
 import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./GitPanelView";
-import { DIFF_VIEW_TYPE, DiffView } from "./DiffView";
+import { DIFF_VIEW_TYPE, DiffView, setDiffPluginInstance } from "./DiffView";
 import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
 
 interface HashCacheEntry {
@@ -46,6 +46,7 @@ export default class CloudSyncPlugin extends Plugin {
 		await this.gitIgnoreManager.ensureExists();
 		await this.migrateLegacyExclusions();
 		await this.gitIgnoreManager.load();
+		setDiffPluginInstance(this);
 
 		this.addSettingTab(new SyncSettingTab(this.app, this));
 		this.statusBar = this.addStatusBarItem();

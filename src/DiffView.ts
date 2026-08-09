@@ -1,4 +1,4 @@
-import { ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
+import { App, ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { createBackend } from "./backend";
 import { messages } from "./i18n";
@@ -6,6 +6,12 @@ import { messages } from "./i18n";
 export const DIFF_VIEW_TYPE = "gitee-sync-plus-diff";
 
 export type DiffKind = "local-mod" | "local-add" | "local-del" | "remote-mod" | "remote-del";
+
+let pluginInstance: CloudSyncPlugin | undefined;
+/** Hands the plugin instance from main.ts to this view, avoiding the undocumented app.plugins API. */
+export function setDiffPluginInstance(p: CloudSyncPlugin): void {
+	pluginInstance = p;
+}
 
 interface DiffState extends Record<string, unknown> {
 	path: string;
@@ -55,7 +61,8 @@ export class DiffView extends ItemView {
 	}
 
 	private get plugin(): CloudSyncPlugin {
-		// App.plugins is not exposed in all Obsidian API versions; cast as needed.
+		if (pluginInstance) return pluginInstance;
+		// Fallback for rare cases where the singleton isn't set yet.
 		const plugins = (this.app as unknown as { plugins?: { getPlugin: (id: string) => unknown } }).plugins;
 		const p = plugins?.getPlugin("gitee-sync-plus") as CloudSyncPlugin | undefined;
 		if (!p) throw new Error(messages().diffPluginNotReady);
@@ -673,7 +680,7 @@ class RevertConfirmModal extends Modal {
 	private readonly message: string;
 	private readonly onConfirm: () => void;
 
-	constructor(app: any, message: string, onConfirm: () => void) {
+	constructor(app: App, message: string, onConfirm: () => void) {
 		super(app);
 		this.message = message;
 		this.onConfirm = onConfirm;

@@ -41,7 +41,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 | Token | Personal access token for the selected platform |
 | Automatic sync interval | Minutes between syncs; `0` disables automatic sync |
 | Sync on startup | Runs one sync when Obsidian opens |
-| Excluded folders | Comma-separated folder prefixes that are not synced |
+| Excluded paths | Raw `.gitignore` rules at the vault root; edits take effect on the next sync |
 | Diagnostic log | Writes the sync plan and result to `_gitee-sync-plus-log.md` |
 
 Trigger sync from the ribbon icon, the **Sync now** command, the status bar, the timer, or startup sync. Use **Preview sync plan** to inspect planned actions without changing either side.
@@ -111,7 +111,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 | 令牌 | 对应平台的私人访问令牌 |
 | 自动同步间隔 | 同步间隔分钟数，`0` 表示关闭 |
 | 启动时同步 | Obsidian 打开后执行一次同步 |
-| 排除目录 | 逗号分隔、不参与同步的目录前缀 |
+| 排除路径 | vault 根目录 `.gitignore` 原始规则，下次同步时生效 |
 | 调试日志 | 将同步计划和结果写入 `_gitee-sync-plus-log.md` |
 
 可通过侧边栏同步图标、命令面板中的 **立即同步**、状态栏、定时器或启动时同步触发。使用 **预览同步计划** 可以在不修改两端文件的情况下检查计划动作。

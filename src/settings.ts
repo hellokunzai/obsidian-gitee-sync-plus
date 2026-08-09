@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, DropdownComponent, PluginSettingTab, Setting } from "obsidian";
 import { messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
 import { fetchBranches } from "./githost";
@@ -314,7 +314,7 @@ export class SyncSettingTab extends PluginSettingTab {
 		const value = currentBranch || defaultBranch;
 
 		// 先渲染下拉框（可能为空或只有当前值）
-		let dropdownComponent: any;
+		let dropdownComponent!: DropdownComponent;
 		let isLoading = false;
 
 		setting.addDropdown((d) => {
@@ -340,7 +340,7 @@ export class SyncSettingTab extends PluginSettingTab {
 						const branches = await fetchBranches(host, owner, repo, token);
 						setCachedBranches(host, owner, repo, branches);
 						// 清空并重新填充选项
-						dropdownComponent.selectEl.innerHTML = "";
+						dropdownComponent.selectEl.empty();
 						for (const branch of branches) {
 							dropdownComponent.addOption(branch, branch);
 						}
