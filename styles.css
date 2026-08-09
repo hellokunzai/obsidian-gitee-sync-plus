@@ -158,44 +158,107 @@
 	overflow: hidden;
 }
 .gitee-sync-plus-diff-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
 	padding: 8px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-path {
 	font-weight: 600;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+.gitee-sync-plus-diff-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-diff-layout-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.gitee-sync-plus-diff-layout-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	border-color: var(--background-modifier-border-hover);
 }
 .gitee-sync-plus-diff-content {
 	flex: 1;
 	overflow: auto;
 	padding: 8px;
 }
-.gitee-sync-plus-diff-labels {
+
+/* ===== Two-pane file diff (side-by-side or stacked) ===== */
+.gitee-sync-plus-diff-files {
 	display: flex;
-	margin-bottom: 6px;
-	font-size: 0.75em;
-	color: var(--text-muted);
-	font-weight: 600;
+	flex-direction: row;
+	height: 100%;
+	min-height: min-content;
 }
-.gitee-sync-plus-diff-label {
+.gitee-sync-plus-diff-content.layout-vertical .gitee-sync-plus-diff-files {
+	flex-direction: column;
+}
+.gitee-sync-plus-diff-section {
 	flex: 1 1 50%;
-	padding: 2px 6px;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--background-primary);
 }
-.gitee-sync-plus-diff-label-left {
-	border-bottom: 2px solid var(--background-modifier-border);
+.gitee-sync-plus-diff-content.layout-vertical .gitee-sync-plus-diff-section {
+	flex: 1 1 auto;
+	width: 100%;
+	height: 50%;
 }
-.gitee-sync-plus-diff-label-right {
-	border-bottom: 2px solid var(--background-modifier-border);
+.gitee-sync-plus-diff-section + .gitee-sync-plus-diff-section {
+	border-left: 1px solid var(--background-modifier-border);
 }
-.gitee-sync-plus-diff-table {
+.gitee-sync-plus-diff-content.layout-vertical .gitee-sync-plus-diff-section + .gitee-sync-plus-diff-section {
+	border-left: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-section-label {
+	flex: 0 0 auto;
+	padding: 4px 8px;
+	font-size: 0.78em;
+	font-weight: 600;
+	color: var(--text-muted);
+	background: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-diff-section-scroll {
+	flex: 1;
+	overflow: auto;
+	min-height: 0;
+}
+.gitee-sync-plus-diff-section-table {
 	width: 100%;
 	border-collapse: collapse;
+	table-layout: fixed;
 	font-family: var(--font-monospace);
 	font-size: 0.82em;
 	line-height: 1.45;
 }
-.gitee-sync-plus-diff-row {
-	border-bottom: 1px solid var(--background-modifier-border-hover);
+.gitee-sync-plus-diff-section-table td {
+	vertical-align: top;
 }
 .gitee-sync-plus-diff-num {
 	width: 36px;
@@ -209,30 +272,28 @@
 	user-select: none;
 }
 .gitee-sync-plus-diff-cell {
-	width: 50%;
 	padding: 1px 6px;
 	white-space: pre;
-	vertical-align: top;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
-.gitee-sync-plus-diff-empty {
-	background: repeating-linear-gradient(
-		45deg,
-		var(--background-primary),
-		var(--background-primary) 8px,
-		var(--background-modifier-border-hover) 8px,
-		var(--background-modifier-border-hover) 16px
-	);
+.gitee-sync-plus-diff-row {
+	border-bottom: 1px solid var(--background-modifier-border-hover);
 }
 .gitee-sync-plus-diff-row.state-equal .gitee-sync-plus-diff-cell {
 	background: var(--background-primary);
 }
-.gitee-sync-plus-diff-row.state-delete .gitee-sync-plus-diff-cell:first-of-type,
-.gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell:first-of-type {
+.gitee-sync-plus-diff-section-before .gitee-sync-plus-diff-row.state-delete .gitee-sync-plus-diff-cell,
+.gitee-sync-plus-diff-section-before .gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell {
 	background: rgba(var(--color-red-rgb), 0.12);
 }
-.gitee-sync-plus-diff-row.state-insert .gitee-sync-plus-diff-cell:last-child,
-.gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell:last-child {
+.gitee-sync-plus-diff-section-after .gitee-sync-plus-diff-row.state-insert .gitee-sync-plus-diff-cell,
+.gitee-sync-plus-diff-section-after .gitee-sync-plus-diff-row.state-change .gitee-sync-plus-diff-cell {
 	background: rgba(var(--color-green-rgb), 0.12);
+}
+.gitee-sync-plus-diff-row.state-empty .gitee-sync-plus-diff-cell {
+	color: var(--text-faint);
+	font-style: italic;
 }
 .gitee-sync-plus-diff-error {
 	color: var(--text-error);

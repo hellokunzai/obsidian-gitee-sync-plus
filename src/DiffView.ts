@@ -38,6 +38,7 @@ export class DiffView extends ItemView {
 	private currentRows: DiffRow[] = [];
 	private currentBeforeText = "";
 	private currentAfterText = "";
+	private layout: "side-by-side" | "vertical" = "side-by-side";
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -84,15 +85,40 @@ export class DiffView extends ItemView {
 		container.addClass("gitee-sync-plus-diff");
 
 		const header = container.createDiv("gitee-sync-plus-diff-header");
-		this.diffContentEl = container.createDiv("gitee-sync-plus-diff-content");
-
-		// Path label is updated once state is known.
 		header.createEl("span", { cls: "gitee-sync-plus-diff-path" });
+		const actions = header.createDiv("gitee-sync-plus-diff-actions");
+		const layoutBtn = actions.createEl("button", {
+			cls: "gitee-sync-plus-diff-layout-btn",
+			title: messages().diffLayoutToggle,
+		});
+		layoutBtn.addEventListener("click", () => this.toggleLayout());
+		this.updateLayoutButton();
+
+		this.diffContentEl = container.createDiv("gitee-sync-plus-diff-content");
 
 		this.opened = true;
 		if (this.viewState) {
 			void this.loadDiff();
 		}
+	}
+
+	private toggleLayout(): void {
+		this.layout = this.layout === "side-by-side" ? "vertical" : "side-by-side";
+		this.updateLayoutButton();
+		if (this.diffContentEl) {
+			this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
+			this.diffContentEl.addClass(`layout-${this.layout}`);
+		}
+	}
+
+	private updateLayoutButton(): void {
+		const btn = this.containerEl.querySelector(".gitee-sync-plus-diff-layout-btn");
+		if (!btn) return;
+		const l = messages();
+		const title = this.layout === "side-by-side" ? l.diffLayoutVertical : l.diffLayoutSideBySide;
+		btn.setAttribute("aria-label", title);
+		btn.setAttribute("title", title);
+		btn.setText(this.layout === "side-by-side" ? "⇅" : "⇄");
 	}
 
 	private updateTitle(): void {
@@ -212,59 +238,83 @@ export class DiffView extends ItemView {
 		this.currentBeforeText = beforeText;
 		this.currentAfterText = afterText;
 
-		// Legend / column labels
-		const labels = this.diffContentEl.createDiv("gitee-sync-plus-diff-labels");
-		labels.createSpan({ text: beforeLabel, cls: "gitee-sync-plus-diff-label gitee-sync-plus-diff-label-left" });
-		labels.createSpan({ text: afterLabel, cls: "gitee-sync-plus-diff-label gitee-sync-plus-diff-label-right" });
+		this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
+		this.diffContentEl.addClass(`layout-${this.layout}`);
+		this.updateLayoutButton();
 
-		const table = this.diffContentEl.createEl("table", { cls: "gitee-sync-plus-diff-table" });
+		// Map line numbers to their diff state for each side.
+		const beforeStates = new Map<number, "equal" | "delete" | "change">();
+		const afterStates = new Map<number, "equal" | "insert" | "change">();
 		for (const row of rows) {
-			const tr = table.createEl("tr", { cls: `gitee-sync-plus-diff-row state-${row.state}` });
-			if (row.chunkIndex >= 0) {
-				tr.setAttribute("data-chunk-index", String(row.chunkIndex));
+			if (row.oldLine > 0) {
+				beforeStates.set(row.oldLine, row.state === "delete" ? "delete" : row.state === "change" ? "change" : "equal");
 			}
-
-			const leftNum = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
-			const leftCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			const rightNum = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
-			const rightCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-
-			if (row.state === "equal") {
-				leftNum.setText(String(row.oldLine));
-				rightNum.setText(String(row.newLine));
-				leftCell.setText(row.oldText);
-				rightCell.setText(row.newText);
-			} else if (row.state === "delete") {
-				leftNum.setText(String(row.oldLine));
-				leftCell.setText(row.oldText);
-			} else if (row.state === "insert") {
-				rightNum.setText(String(row.newLine));
-				rightCell.setText(row.newText);
-			} else {
-				// change: show both sides; line numbers come from the original line positions.
-				leftNum.setText(row.oldLine > 0 ? String(row.oldLine) : "");
-				rightNum.setText(row.newLine > 0 ? String(row.newLine) : "");
-				leftCell.setText(row.oldText);
-				rightCell.setText(row.newText);
+			if (row.newLine > 0) {
+				afterStates.set(row.newLine, row.state === "insert" ? "insert" : row.state === "change" ? "change" : "equal");
 			}
+		}
 
-			// Empty cells in delete/insert rows get a subtle dimming via CSS.
-			if (row.state === "delete") {
-				rightCell.addClass("gitee-sync-plus-diff-empty");
-			} else if (row.state === "insert") {
-				leftCell.addClass("gitee-sync-plus-diff-empty");
-			}
+		// Determine first rows of each chunk on each side so we can place revert buttons.
+		const beforeChunkFirstRows = new Map<number, number>();
+		const afterChunkFirstRows = new Map<number, number>();
+		for (const row of rows) {
+			if (row.chunkIndex < 0 || !this.isFirstRowOfChunk(row, rows)) continue;
+			if (row.oldLine > 0) beforeChunkFirstRows.set(row.oldLine, row.chunkIndex);
+			if (row.newLine > 0) afterChunkFirstRows.set(row.newLine, row.chunkIndex);
+		}
 
-			// Revert-chunk button on the first row of each diff chunk.
-			if (row.chunkIndex >= 0 && this.isFirstRowOfChunk(row, rows)) {
-				const revertBtn = rightNum.createEl("button", {
+		const wrapper = this.diffContentEl.createDiv("gitee-sync-plus-diff-files");
+
+		this.renderFileSection(wrapper, beforeLabel, beforeLines, beforeStates, beforeChunkFirstRows, "before");
+		this.renderFileSection(wrapper, afterLabel, afterLines, afterStates, afterChunkFirstRows, "after");
+	}
+
+	private renderFileSection(
+		wrapper: HTMLElement,
+		label: string,
+		lines: string[],
+		lineStates: Map<number, "equal" | "delete" | "change" | "insert">,
+		chunkFirstRows: Map<number, number>,
+		side: "before" | "after"
+	): void {
+		const l = messages();
+		const section = wrapper.createDiv(`gitee-sync-plus-diff-section gitee-sync-plus-diff-section-${side}`);
+		const labelEl = section.createDiv("gitee-sync-plus-diff-section-label");
+		labelEl.setText(label);
+
+		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
+		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
+		const tbody = table.createEl("tbody");
+
+		if (lines.length === 0) {
+			const tr = tbody.createEl("tr", { cls: "gitee-sync-plus-diff-row state-empty" });
+			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+			numCell.setText("-");
+			const textCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+			textCell.setText(l.diffLeftEmpty);
+			return;
+		}
+
+		for (let i = 0; i < lines.length; i++) {
+			const lineNumber = i + 1;
+			const state = lineStates.get(lineNumber) ?? "equal";
+			const tr = tbody.createEl("tr", { cls: `gitee-sync-plus-diff-row state-${state}` });
+
+			const numCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-num" });
+			numCell.setText(String(lineNumber));
+			const textCell = tr.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+			textCell.setText(lines[i]);
+
+			const chunkIndex = chunkFirstRows.get(lineNumber);
+			if (chunkIndex !== undefined) {
+				const revertBtn = numCell.createEl("button", {
 					text: "←",
 					title: l.diffRevertChunk,
 					cls: "gitee-sync-plus-diff-revert-btn",
 				});
 				revertBtn.addEventListener("click", (evt) => {
 					evt.stopPropagation();
-					void this.onRevertChunk(row.chunkIndex);
+					void this.onRevertChunk(chunkIndex);
 				});
 			}
 		}
