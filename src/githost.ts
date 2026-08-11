@@ -121,7 +121,8 @@ function encodePath(path: string): string {
  *   delete  — Gitee: params in query; GitHub: JSON body
  */
 export class GitHostBackend implements StorageBackend {
-	readonly id = "git-blob-sha1";
+	/** Bumped from "git-blob-sha1" to invalidate stale caches after adding LF normalization. */
+	readonly id = "git-blob-sha1-lf";
 
 	constructor(private cfg: GitHostConfig) {}
 

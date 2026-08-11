@@ -581,7 +581,9 @@ export class SyncEngine {
 			) {
 				hash = cached.hash;
 			} else {
-				hash = await backend.hashData(await adapter.readBinary(path));
+				let data = await adapter.readBinary(path);
+				data = normalizeLineEndings(data);
+				hash = await backend.hashData(data);
 				cache[path] = {
 					mtime: stat.mtime,
 					size: stat.size,
@@ -626,6 +628,36 @@ export class SyncEngine {
 			}
 		}
 	}
+}
+
+/**
+ * Normalizes CRLF to LF in text files so that hash comparison is
+ * line-ending-agnostic on Windows.  Binary files (containing \0 bytes)
+ * are returned unchanged.
+ */
+function normalizeLineEndings(data: ArrayBuffer): ArrayBuffer {
+	const bytes = new Uint8Array(data);
+	// Fast path: no CR bytes → already normalized or binary.
+	let hasCR = false;
+	for (let i = 0; i < bytes.length; i++) {
+		if (bytes[i] === 0x0d) {
+			hasCR = true;
+			break;
+		}
+	}
+	if (!hasCR) return data;
+	// Detect binary: reject if any null byte in the first 1 KB.
+	const sampleLen = Math.min(bytes.length, 1024);
+	for (let i = 0; i < sampleLen; i++) {
+		if (bytes[i] === 0) return data;
+	}
+	// Strip \r before \n (CRLF → LF).
+	const result: number[] = [];
+	for (let i = 0; i < bytes.length; i++) {
+		if (bytes[i] === 0x0d && i + 1 < bytes.length && bytes[i + 1] === 0x0a) continue;
+		result.push(bytes[i]);
+	}
+	return new Uint8Array(result).buffer;
 }
 
 function ts(ms: number): string {
