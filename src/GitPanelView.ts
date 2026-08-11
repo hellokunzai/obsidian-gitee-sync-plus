@@ -489,7 +489,10 @@ export class GitPanelView extends ItemView {
 				new Notice(l.panelNothingStaged, 4000);
 				return;
 			}
+			const pending = this.staged.size; // 暂存区数量
+			this.setStatus(l.panelStatusCommitCount(0, pending));
 			const summary = await this.engine.pushLocal(msg, new Set(this.staged));
+			this.setStatus(l.panelStatusCommitCount(summary.pushed, 0));
 			this.staged.clear();
 			this.messageEl.value = "";
 			this.plugin.announceSummary(summary);
