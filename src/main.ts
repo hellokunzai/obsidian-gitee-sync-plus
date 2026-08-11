@@ -249,5 +249,16 @@ export default class CloudSyncPlugin extends Plugin {
 		this.app.saveLocalStorage(LOCAL_SYNC_STATE_KEY, this.syncState);
 		const data: PluginData = { settings: this.settings, hashCache: this.hashCache };
 		await this.saveData(data);
+		this.notifyGitPanelsOfSettingsChange();
+	}
+
+	/** Notify all open Git panels that settings have changed so they update their target label and refresh. */
+	private notifyGitPanelsOfSettingsChange(): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(GIT_PANEL_VIEW_TYPE)) {
+			const view = leaf.view;
+			if (view instanceof GitPanelView) {
+				view.onSettingsChanged();
+			}
+		}
 	}
 }

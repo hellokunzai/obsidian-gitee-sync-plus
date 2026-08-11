@@ -68,6 +68,7 @@ export class GitPanelView extends ItemView {
 	private messageEl!: HTMLTextAreaElement;
 	private listEl!: HTMLElement;
 	private statusEl!: HTMLElement;
+	private infoEl!: HTMLElement;
 	private busy = false;
 	private refreshTimer: number | null = null;
 	/** Paths selected for the next commit. Reset when a commit succeeds. */
@@ -105,8 +106,8 @@ export class GitPanelView extends ItemView {
 		this.statusEl = header.createSpan({ cls: "gitee-sync-plus-panel-status" });
 
 		// Target repo / branch
-		const info = container.createDiv("gitee-sync-plus-panel-info");
-		info.setText(this.targetLabel());
+		this.infoEl = container.createDiv("gitee-sync-plus-panel-info");
+		this.infoEl.setText(this.targetLabel());
 
 		// Commit message
 		const msgWrap = container.createDiv("gitee-sync-plus-panel-message");
@@ -158,6 +159,12 @@ export class GitPanelView extends ItemView {
 			return `github: ${s.githubOwner}/${s.githubRepo}@${s.githubBranch}`;
 		}
 		return `gitee: ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
+	}
+
+	/** Called by the plugin when settings change. Updates the repo/branch label and refreshes. */
+	onSettingsChanged(): void {
+		if (this.infoEl) this.infoEl.setText(this.targetLabel());
+		void this.refresh(true);
 	}
 
 	private setStatus(text: string): void {
