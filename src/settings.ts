@@ -339,13 +339,12 @@ export class SyncSettingTab extends PluginSettingTab {
 						clearBranchCache(host, owner, repo);
 						const branches = await fetchBranches(host, owner, repo, token);
 						setCachedBranches(host, owner, repo, branches);
-						// 清空并重新填充选项
+						// 先记录当前选择，再清空并重新填充选项
+						const currentVal = dropdownComponent.getValue() as string;
 						dropdownComponent.selectEl.empty();
 						for (const branch of branches) {
 							dropdownComponent.addOption(branch, branch);
 						}
-						// 保留当前选择，如果存在的话
-						const currentVal = dropdownComponent.getValue() as string;
 						if (branches.includes(currentVal)) {
 							dropdownComponent.setValue(currentVal);
 						} else if (branches.length > 0) {
@@ -367,13 +366,14 @@ export class SyncSettingTab extends PluginSettingTab {
 		if (owner && repo && token) {
 			const cached = getCachedBranches(host, owner, repo);
 			if (cached) {
-				// 有缓存，直接填充
+				// 先记录当前选择，再重新填充缓存分支
+				const currentVal = dropdownComponent.getValue() as string;
 				dropdownComponent.selectEl.innerHTML = "";
 				for (const branch of cached) {
 					dropdownComponent.addOption(branch, branch);
 				}
-				if (cached.includes(value)) {
-					dropdownComponent.setValue(value);
+				if (cached.includes(currentVal)) {
+					dropdownComponent.setValue(currentVal);
 				} else if (cached.length > 0) {
 					dropdownComponent.setValue(cached[0]);
 					setBranch(cached[0]);
