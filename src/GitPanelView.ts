@@ -133,7 +133,7 @@ export class GitPanelView extends ItemView {
 			.addEventListener("click", () => void this.onPull());
 		btnRow
 			.createEl("button", { text: l.panelRefresh, cls: "gitee-sync-plus-panel-btn" })
-			.addEventListener("click", () => void this.refresh());
+			.addEventListener("click", () => void this.refresh(true));
 
 		// Changes list
 		this.listEl = container.createDiv("gitee-sync-plus-panel-list");
@@ -144,7 +144,7 @@ export class GitPanelView extends ItemView {
 		this.registerEvent(this.app.vault.on("delete", () => this.scheduleRefresh()));
 		this.registerEvent(this.app.vault.on("rename", () => this.scheduleRefresh()));
 
-		await this.refresh();
+		await this.refresh(true);
 	}
 
 	async onClose(): Promise<void> {
@@ -169,16 +169,18 @@ export class GitPanelView extends ItemView {
 		this.refreshTimer = window.setTimeout(() => {
 			this.refreshTimer = null;
 			void this.refresh();
-		}, 1500);
+		}, 3000);
 	}
 
-	async refresh(): Promise<void> {
+	async refresh(force = false): Promise<void> {
 		if (this.busy) return;
+		if (!force && !this.containerEl.isShown()) return;
 		this.busy = true;
 		const l = messages();
 		try {
+			if (force) this.engine.invalidateCaches();
 			this.setStatus(l.panelStatusComputing);
-			this.plan = await this.engine.computePlan();
+			this.plan = await this.engine.computePlan({ forPanel: true });
 			this.renderList();
 			this.setStatus(l.panelStatusChanges(this.changeCount()));
 		} catch (e) {

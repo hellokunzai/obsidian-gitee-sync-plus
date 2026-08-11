@@ -55,6 +55,24 @@ export class SyncEngine {
 		return this.plugin.gitIgnoreManager.isIgnored(path);
 	}
 
+	/** Cache of the remote manifest to avoid repeated API calls during panel refreshes. */
+	private manifestCache: { entries: RemoteEntry[]; ts: number } | null = null;
+	private readonly MANIFEST_CACHE_TTL = 5000;
+
+	private async fetchManifest(backend: StorageBackend): Promise<RemoteEntry[]> {
+		if (this.manifestCache && Date.now() - this.manifestCache.ts < this.MANIFEST_CACHE_TTL) {
+			return this.manifestCache.entries;
+		}
+		const entries = await backend.manifest();
+		this.manifestCache = { entries, ts: Date.now() };
+		return entries;
+	}
+
+	/** Drops cached remote state; call before mutating operations. */
+	invalidateCaches(): void {
+		this.manifestCache = null;
+	}
+
 	/** Dry run: build and describe the plan without transferring anything. */
 	async preview(): Promise<{ plan: SyncPlan; report: string }> {
 		const backend = createBackend(this.plugin.settings);
@@ -63,6 +81,7 @@ export class SyncEngine {
 	}
 
 	async run(message?: string): Promise<SyncSummary> {
+		this.invalidateCaches();
 		const l = messages();
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
@@ -117,12 +136,13 @@ export class SyncEngine {
 	}
 
 	/** Builds the three-way sync plan without transferring anything. */
-	async computePlan(): Promise<SyncPlan> {
-		return this.buildPlan(createBackend(this.plugin.settings));
+	async computePlan(opts?: { forPanel?: boolean }): Promise<SyncPlan> {
+		return this.buildPlan(createBackend(this.plugin.settings), opts);
 	}
 
 	/** Phase 1 only: download remote changes and apply remote deletions. */
 	async pullRemote(): Promise<SyncSummary> {
+		this.invalidateCaches();
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
 		const summary: SyncSummary = {
@@ -152,6 +172,7 @@ export class SyncEngine {
 	 * the rest remain in the working tree for a later commit.
 	 */
 	async pushLocal(message?: string, staged?: Set<string>): Promise<SyncSummary> {
+		this.invalidateCaches();
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
 		const summary: SyncSummary = {
@@ -332,11 +353,15 @@ export class SyncEngine {
 		}
 	}
 
-	private async buildPlan(backend: StorageBackend): Promise<SyncPlan> {
+	private async buildPlan(
+		backend: StorageBackend,
+		opts: { forPanel?: boolean } = {}
+	): Promise<SyncPlan> {
 		await this.plugin.gitIgnoreManager.load();
 		const l = messages();
+		const resolveConflictMtime = !opts.forPanel;
 		const [remoteList, local] = await Promise.all([
-			backend.manifest(),
+			this.fetchManifest(backend),
 			this.buildLocalManifest(backend),
 		]);
 		const remote = new Map<string, RemoteEntry>(
@@ -400,19 +425,31 @@ export class SyncEngine {
 				// a modification beats a deletion.
 				plan.conflicts++;
 				if (loc && rem) {
-					const remoteMtime = await this.remoteMtime(backend, path, rem);
-					if (loc.mtime >= remoteMtime) {
+					// Panel mode avoids expensive per-file commit-time lookups.
+					if (resolveConflictMtime) {
+						const remoteMtime = await this.remoteMtime(backend, path, rem);
+						if (loc.mtime >= remoteMtime) {
+							plan.pushes.push({
+								path,
+								loc,
+								rem,
+								reason: l.reasonConflictLocalNewer(ts(loc.mtime), ts(remoteMtime)),
+							});
+						} else {
+							plan.pulls.push({
+								path,
+								rem,
+								reason: l.reasonConflictRemoteNewer(ts(remoteMtime), ts(loc.mtime)),
+							});
+						}
+					} else {
+						// In the panel we only need to know the file is conflicting;
+						// the exact winner is resolved when the sync is actually run.
 						plan.pushes.push({
 							path,
 							loc,
 							rem,
-							reason: l.reasonConflictLocalNewer(ts(loc.mtime), ts(remoteMtime)),
-						});
-					} else {
-						plan.pulls.push({
-							path,
-							rem,
-							reason: l.reasonConflictRemoteNewer(ts(remoteMtime), ts(loc.mtime)),
+							reason: l.reasonConflictBothChanged,
 						});
 					}
 				} else if (loc) {
@@ -527,11 +564,13 @@ export class SyncEngine {
 
 		const allFiles = await this.listAllFiles("");
 
-		for (const path of allFiles) {
-			if (this.isExcluded(path)) continue;
+		// Process files in small concurrent batches to avoid sequential I/O.
+		const CONCURRENCY = 10;
+		const processFile = async (path: string): Promise<void> => {
+			if (this.isExcluded(path)) return;
 			seen.add(path);
 			const stat = await adapter.stat(path);
-			if (!stat || stat.type !== "file") continue;
+			if (!stat || stat.type !== "file") return;
 			const cached = cache[path];
 			let hash: string;
 			if (
@@ -551,6 +590,11 @@ export class SyncEngine {
 				};
 			}
 			result.set(path, { path, hash, mtime: stat.mtime });
+		};
+
+		for (let i = 0; i < allFiles.length; i += CONCURRENCY) {
+			const batch = allFiles.slice(i, i + CONCURRENCY);
+			await Promise.all(batch.map(processFile));
 		}
 
 		for (const path of Object.keys(cache)) {

@@ -108,6 +108,7 @@ const en = {
 		`Conflict: remote is newer (remote ${remote} > local ${local})`,
 	reasonConflictKeepLocal: "Conflict: remote was deleted but local was modified; keep local",
 	reasonConflictKeepRemote: "Conflict: local was deleted but remote was modified; keep remote",
+	reasonConflictBothChanged: "Conflict: both sides changed since last sync",
 	planBackend: (target: string) => `Backend: ${target}`,
 	planCounts: (local: number, remote: number, base: number, unchanged: number, conflicts: number) =>
 		`Local ${local} | Remote ${remote} | **Baseline ${base}** | Unchanged ${unchanged} | Conflicts ${conflicts}`,
@@ -289,6 +290,7 @@ const zh: typeof en = {
 	reasonConflictRemoteNewer: (remote, local) => `冲突：远端较新（远端 ${remote} > 本地 ${local}）`,
 	reasonConflictKeepLocal: "冲突：远端已删但本地有修改，保留本地",
 	reasonConflictKeepRemote: "冲突：本地已删但远端有修改，保留远端",
+	reasonConflictBothChanged: "冲突：自上次同步以来两端都已修改",
 	planBackend: (target) => `后端：${target}`,
 	planCounts: (local, remote, base, unchanged, conflicts) =>
 		`本地 ${local} | 远端 ${remote} | **基线 ${base}** | 一致跳过 ${unchanged} | 冲突 ${conflicts}`,
