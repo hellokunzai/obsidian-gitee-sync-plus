@@ -264,25 +264,18 @@ export class GitPanelView extends ItemView {
 			})),
 		];
 
-		if (stagedItems.length === 0 && unstagedItems.length === 0 && remoteItems.length === 0) {
-			this.listEl.createDiv({ text: l.panelNoChanges, cls: "gitee-sync-plus-panel-empty" });
-			return;
-		}
-
-		if (stagedItems.length > 0) {
-			this.renderGroup("staged", l.panelGroupStaged, stagedItems, "staged", {
-				unstageAll: () => this.onUnstageAll(),
-			});
-		}
-		if (unstagedItems.length > 0) {
-			this.renderGroup("unstaged", l.panelGroupUnstaged, unstagedItems, "unstaged", {
-				stageAll: () => this.onStageAll(),
-				discardAll: () => this.onDiscardAll(),
-			});
-		}
-		if (remoteItems.length > 0) {
-			this.renderGroup("remote", l.panelGroupRemote, remoteItems);
-		}
+		// Always render the three groups — even when empty — so the panel
+		// mirrors a conventional source-control sidebar: the group headers
+		// (Staged / Changes / Remote) stay visible, and an empty group shows
+		// a "无" placeholder instead of disappearing.
+		this.renderGroup("staged", l.panelGroupStaged, stagedItems, "staged", {
+			unstageAll: () => this.onUnstageAll(),
+		});
+		this.renderGroup("unstaged", l.panelGroupUnstaged, unstagedItems, "unstaged", {
+			stageAll: () => this.onStageAll(),
+			discardAll: () => this.onDiscardAll(),
+		});
+		this.renderGroup("remote", l.panelGroupRemote, remoteItems);
 	}
 
 	private renderGroup(
