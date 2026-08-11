@@ -72,6 +72,8 @@ export class GitPanelView extends ItemView {
 	private refreshTimer: number | null = null;
 	/** Paths selected for the next commit. Reset when a commit succeeds. */
 	private staged = new Set<string>();
+	/** Group keys that are currently collapsed in the Git panel. */
+	private collapsedGroups = new Set<string>();
 
 	constructor(leaf: WorkspaceLeaf, plugin: CloudSyncPlugin) {
 		super(leaf);
@@ -259,22 +261,23 @@ export class GitPanelView extends ItemView {
 		}
 
 		if (stagedItems.length > 0) {
-			this.renderGroup(l.panelGroupStaged, stagedItems, "staged", {
+			this.renderGroup("staged", l.panelGroupStaged, stagedItems, "staged", {
 				unstageAll: () => this.onUnstageAll(),
 			});
 		}
 		if (unstagedItems.length > 0) {
-			this.renderGroup(l.panelGroupUnstaged, unstagedItems, "unstaged", {
+			this.renderGroup("unstaged", l.panelGroupUnstaged, unstagedItems, "unstaged", {
 				stageAll: () => this.onStageAll(),
 				discardAll: () => this.onDiscardAll(),
 			});
 		}
 		if (remoteItems.length > 0) {
-			this.renderGroup(l.panelGroupRemote, remoteItems);
+			this.renderGroup("remote", l.panelGroupRemote, remoteItems);
 		}
 	}
 
 	private renderGroup(
+		groupKey: string,
 		title: string,
 		items: PanelItem[],
 		mode?: "staged" | "unstaged",
@@ -282,11 +285,32 @@ export class GitPanelView extends ItemView {
 	): void {
 		const l = messages();
 		const group = this.listEl.createDiv("gitee-sync-plus-panel-group");
+		const isCollapsed = this.collapsedGroups.has(groupKey);
+		if (isCollapsed) group.addClass("is-collapsed");
+
 		const header = group.createDiv("gitee-sync-plus-panel-group-header");
-		header.createSpan({
+		const headerLeft = header.createDiv("gitee-sync-plus-panel-group-header-left");
+		const collapseBtn = headerLeft.createEl("button", {
+			cls: "gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-collapse-btn",
+			title: isCollapsed ? l.panelExpandGroup : l.panelCollapseGroup,
+		});
+		setIcon(collapseBtn, isCollapsed ? "chevron-right" : "chevron-down");
+		collapseBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.toggleGroupCollapse(groupKey);
+		});
+		headerLeft.createSpan({
 			text: `${title} (${items.length})`,
 			cls: "gitee-sync-plus-panel-group-title",
 		});
+
+		// Clicking the header (except action buttons) toggles the group.
+		header.addEventListener("click", (e) => {
+			const target = e.target as HTMLElement;
+			if (target.closest(".gitee-sync-plus-panel-group-actions")) return;
+			this.toggleGroupCollapse(groupKey);
+		});
+
 		const headerBtns = header.createDiv("gitee-sync-plus-panel-group-actions");
 		if (actions?.discardAll) {
 			const btn = headerBtns.createEl("button", {
@@ -313,12 +337,15 @@ export class GitPanelView extends ItemView {
 			btn.addEventListener("click", actions.unstageAll);
 		}
 		if (items.length === 0) {
-			group.createDiv({
-				text: l.panelGroupEmpty,
-				cls: "gitee-sync-plus-panel-group-empty",
-			});
+			if (!isCollapsed) {
+				group.createDiv({
+					text: l.panelGroupEmpty,
+					cls: "gitee-sync-plus-panel-group-empty",
+				});
+			}
 			return;
 		}
+		if (isCollapsed) return;
 		for (const item of items) {
 			const row = group.createDiv("gitee-sync-plus-panel-item");
 
@@ -370,6 +397,15 @@ export class GitPanelView extends ItemView {
 				});
 			}
 		}
+	}
+
+	private toggleGroupCollapse(groupKey: string): void {
+		if (this.collapsedGroups.has(groupKey)) {
+			this.collapsedGroups.delete(groupKey);
+		} else {
+			this.collapsedGroups.add(groupKey);
+		}
+		this.renderList();
 	}
 
 	private openDiff(item: PanelItem): void {

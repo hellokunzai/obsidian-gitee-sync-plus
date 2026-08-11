@@ -156,6 +156,8 @@ const en = {
 	panelUnstageAllHint: "Unstage all changes",
 	panelNothingStaged: "No staged changes to commit",
 	panelViewDiff: "View diff",
+	panelCollapseGroup: "Collapse",
+	panelExpandGroup: "Expand",
 
 	diffTitle: "Diff",
 	diffTitleFor: (path: string) => `Diff: ${path}`,
@@ -335,6 +337,8 @@ const zh: typeof en = {
 	panelUnstageAllHint: "取消暂存所有更改",
 	panelNothingStaged: "没有已暂存的更改可提交",
 	panelViewDiff: "查看差异",
+	panelCollapseGroup: "折叠",
+	panelExpandGroup: "展开",
 
 	diffTitle: "差异对比",
 	diffTitleFor: (path) => `差异：${path}`,

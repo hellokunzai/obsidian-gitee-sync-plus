@@ -73,11 +73,34 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 6px;
+	cursor: pointer;
+	border-radius: 4px;
+}
+.gitee-sync-plus-panel-group-header:hover {
+	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-panel-group-header-left {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
 }
 .gitee-sync-plus-panel-group-title {
 	font-size: 0.82em;
 	font-weight: 600;
 	color: var(--text-muted);
+}
+.gitee-sync-plus-panel-collapse-btn {
+	width: 18px;
+	height: 18px;
+	color: var(--text-faint);
+}
+.gitee-sync-plus-panel-collapse-btn svg {
+	width: 14px;
+	height: 14px;
+}
+.gitee-sync-plus-panel-group.is-collapsed .gitee-sync-plus-panel-group-title {
+	color: var(--text-faint);
 }
 .gitee-sync-plus-panel-group-actions {
 	display: flex;
