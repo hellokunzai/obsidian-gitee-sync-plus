@@ -79,6 +79,11 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 };
 
 export class SyncSettingTab extends PluginSettingTab {
+	private branchWidgets = new Map<
+		"gitee" | "github",
+		{ setting: Setting; dropdown: DropdownComponent; host: "gitee" | "github" }
+	>();
+
 	constructor(app: App, private plugin: CloudSyncPlugin) {
 		super(app, plugin);
 	}
@@ -86,10 +91,19 @@ export class SyncSettingTab extends PluginSettingTab {
 	async display(): Promise<void> {
 		const { containerEl } = this;
 		containerEl.empty();
+		// Wipe the branch-widget registry: the old dropdowns are detached and any
+		// refreshBranchDropdown() call must only ever touch live elements.
+		this.branchWidgets.clear();
 		const l = messages();
 		const s = this.plugin.settings;
 		const save = () => this.plugin.savePluginData();
 		const gitignoreContent = await this.plugin.gitIgnoreManager.readFullContent();
+
+		// Opportunistic migration: when the user opens the settings panel we move
+		// any plaintext token still sitting in data.json into the OS keychain.
+		// The savePluginData inside the helper also redacts data.json.
+		await this.plugin.migrateTokensToKeychain();
+		const hasKeychain = !!this.app.secretStorage;
 
 		// ── 仓库设置 ──────────────────────────────────────
 		this.createSectionHeader(containerEl, l.sectionRepo);
@@ -112,15 +126,23 @@ export class SyncSettingTab extends PluginSettingTab {
 		if (s.backend === "gitee") {
 			new Setting(containerEl)
 				.setName(l.settingsGiteeToken)
-				.setDesc(l.settingsGiteeTokenDesc)
-				.addText((t) => {
-					t.inputEl.type = "password";
-					t.setValue(s.giteeToken).onChange(async (v) => {
-						s.giteeToken = v.trim();
-						await save();
-						this.display();
-					});
+				.setDesc(
+					hasKeychain
+						? `${l.settingsGiteeTokenDesc} ${l.tokenStoredInKeychain}`
+						: l.settingsGiteeTokenDesc
+				)
+.addText((t) => {
+				t.inputEl.type = "password";
+				// Typing updates the in-memory value only; the keychain mirror (and
+				// the redacted data.json copy) is written once when the field loses
+				// focus, not on every keystroke.
+				t.setValue(s.giteeToken).onChange(async (v) => {
+					s.giteeToken = v.trim();
 				});
+				t.inputEl.addEventListener("blur", () => {
+					void save();
+				});
+			});
 
 			new Setting(containerEl)
 				.setName(l.settingsGiteeOwner)
@@ -129,7 +151,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("your-name").setValue(s.giteeOwner).onChange(async (v) => {
 						s.giteeOwner = v.trim();
 						await save();
-						this.display();
+						void this.refreshBranchDropdown("gitee");
 					})
 				);
 
@@ -140,7 +162,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("obsidian-vault").setValue(s.giteeRepo).onChange(async (v) => {
 						s.giteeRepo = v.trim();
 						await save();
-						this.display();
+						void this.refreshBranchDropdown("gitee");
 					})
 				);
 
@@ -158,15 +180,23 @@ export class SyncSettingTab extends PluginSettingTab {
 		} else {
 			new Setting(containerEl)
 				.setName(l.settingsGithubToken)
-				.setDesc(l.settingsGithubTokenDesc)
-				.addText((t) => {
-					t.inputEl.type = "password";
-					t.setValue(s.githubToken).onChange(async (v) => {
-						s.githubToken = v.trim();
-						await save();
-						this.display();
-					});
+				.setDesc(
+					hasKeychain
+						? `${l.settingsGithubTokenDesc} ${l.tokenStoredInKeychain}`
+						: l.settingsGithubTokenDesc
+				)
+.addText((t) => {
+				t.inputEl.type = "password";
+				// Typing updates the in-memory value only; the keychain mirror (and
+				// the redacted data.json copy) is written once when the field loses
+				// focus, not on every keystroke.
+				t.setValue(s.githubToken).onChange(async (v) => {
+					s.githubToken = v.trim();
 				});
+				t.inputEl.addEventListener("blur", () => {
+					void save();
+				});
+			});
 
 			new Setting(containerEl)
 				.setName(l.settingsGithubOwner)
@@ -175,7 +205,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("your-name").setValue(s.githubOwner).onChange(async (v) => {
 						s.githubOwner = v.trim();
 						await save();
-						this.display();
+						void this.refreshBranchDropdown("github");
 					})
 				);
 
@@ -186,7 +216,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					t.setPlaceholder("obsidian-vault").setValue(s.githubRepo).onChange(async (v) => {
 						s.githubRepo = v.trim();
 						await save();
-						this.display();
+						void this.refreshBranchDropdown("github");
 					})
 				);
 
@@ -327,6 +357,10 @@ export class SyncSettingTab extends PluginSettingTab {
 			});
 		});
 
+		// Register the widget so refreshBranchDropdown() can update it in place
+		// when owner/repo changes, without re-rendering the whole settings panel.
+		this.branchWidgets.set(host, { setting, dropdown: dropdownComponent, host });
+
 		setting.addButton((b) =>
 			b
 				.setIcon("refresh-cw")
@@ -383,6 +417,44 @@ export class SyncSettingTab extends PluginSettingTab {
 			// 无缓存时不自动加载，等用户点击刷新按钮
 		} else {
 			setting.setDesc(l.settingsBranchNeedInfo);
+		}
+	}
+
+	/**
+	 * Re-fetches branches for the given host using the CURRENT settings
+	 * (owner/repo/token) and refreshes the dropdown options in place. Called
+	 * from the owner/repo onChange handlers instead of the full this.display()
+	 * re-render so the user does not lose focus on every keystroke.
+	 */
+	private async refreshBranchDropdown(host: "gitee" | "github"): Promise<void> {
+		const widget = this.branchWidgets.get(host);
+		if (!widget) return;
+		const s = this.plugin.settings;
+		const owner = host === "gitee" ? s.giteeOwner : s.githubOwner;
+		const repo = host === "gitee" ? s.giteeRepo : s.githubRepo;
+		const token = host === "gitee" ? s.giteeToken : s.githubToken;
+		if (!owner || !repo || !token) return;
+
+		try {
+			clearBranchCache(host, owner, repo);
+			const branches = await fetchBranches(host, owner, repo, token);
+			setCachedBranches(host, owner, repo, branches);
+			const currentVal = widget.dropdown.getValue() as string;
+			widget.dropdown.selectEl.empty();
+			for (const branch of branches) {
+				widget.dropdown.addOption(branch, branch);
+			}
+			if (branches.includes(currentVal)) {
+				widget.dropdown.setValue(currentVal);
+			} else if (branches.length > 0) {
+				widget.dropdown.setValue(branches[0]);
+				if (host === "gitee") s.giteeBranch = branches[0];
+				else s.githubBranch = branches[0];
+				await this.plugin.savePluginData();
+			}
+			widget.setting.setDesc("");
+		} catch {
+			widget.setting.setDesc(messages().settingsBranchLoadFailed);
 		}
 	}
 }
