@@ -1,5 +1,11 @@
 # 更新日志
 
+## 1.0.7（2026-08-13）
+
+选择密钥弹窗固定高度，避免随密钥数量伸缩。
+
+- `styles.css`：`.gitee-sync-plus-token-modal .modal-content` 由 `max-height: 70vh` 改为固定 `height: 440px`，列表区保持 `overflow-y: auto` 可滚动
+
 ## 1.0.6（2026-08-13）
 
 私人令牌改为通过「选择秘钥」对话框管理，并新增测试按钮。
