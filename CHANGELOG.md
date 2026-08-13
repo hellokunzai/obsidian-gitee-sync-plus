@@ -1,5 +1,12 @@
 # 更新日志
 
+## 1.0.8（2026-08-13）
+
+修复社区市场审核不通过问题。
+
+- `manifest.json`：`minAppVersion` 从 `1.8.7` 提升到 `1.11.4`（匹配 `secretStorage` API 引入版本）
+- `package.json`：移除已废弃的 `builtin-modules` 依赖
+
 ## 1.0.7（2026-08-13）
 
 选择密钥弹窗固定高度，避免随密钥数量伸缩。
