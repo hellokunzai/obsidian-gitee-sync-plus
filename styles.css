@@ -488,3 +488,162 @@
 	gap: 8px;
 	margin-top: 16px;
 }
+
+/* ===== Token select modal ===== */
+.gitee-sync-plus-token-modal {
+	width: 520px !important;
+	max-width: 90vw !important;
+}
+
+.gitee-sync-plus-token-modal .modal-content {
+	display: flex;
+	flex-direction: column;
+	max-height: 70vh;
+	overflow: hidden;
+}
+
+.gitee-sync-plus-token-title {
+	margin-bottom: 12px;
+	flex: 0 0 auto;
+}
+
+.gitee-sync-plus-token-search {
+	margin-bottom: 12px;
+}
+
+.gitee-sync-plus-token-search-input {
+	width: 100%;
+}
+
+.gitee-sync-plus-token-add-form {
+	margin-bottom: 12px;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+}
+
+.gitee-sync-plus-token-add-input {
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+.gitee-sync-plus-token-add-input[type="password"] {
+	font-family: var(--font-monospace);
+}
+
+.gitee-sync-plus-token-add-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.gitee-sync-plus-token-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1 1 auto;
+	overflow-y: auto;
+	min-height: 0;
+	margin-bottom: 0;
+}
+
+.gitee-sync-plus-token-empty {
+	color: var(--text-muted);
+	font-size: 0.9em;
+	padding: 8px;
+	text-align: center;
+}
+
+.gitee-sync-plus-token-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.gitee-sync-plus-token-item.is-selected {
+	background: var(--background-modifier-form-field-highlighted);
+	border-color: var(--text-accent);
+}
+
+.gitee-sync-plus-token-item-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.gitee-sync-plus-token-name {
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.gitee-sync-plus-token-badge {
+	font-size: 0.75em;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: var(--text-accent);
+	color: var(--text-on-accent);
+}
+
+.gitee-sync-plus-token-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 0 0 auto;
+}
+
+.gitee-sync-plus-token-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.gitee-sync-plus-token-icon-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.gitee-sync-plus-token-icon-btn svg {
+	width: 15px;
+	height: 15px;
+}
+
+.gitee-sync-plus-token-value {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: 0.8em;
+	color: var(--text-muted);
+	word-break: break-all;
+	margin-top: 4px;
+}
+
+.gitee-sync-plus-token-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-top: 16px;
+	flex: 0 0 auto;
+}
+
+.gitee-sync-plus-token-footer-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}

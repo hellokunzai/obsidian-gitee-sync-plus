@@ -38,7 +38,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 | Owner | User or organization from the repository URL |
 | Repository | Private repository used for the vault |
 | Branch | Gitee defaults to `master`; GitHub defaults to `main` |
-| Token | Personal access token for the selected platform |
+| Token | Managed personal access tokens. Click **Select token** to add or choose a saved token; click **Test** to verify it. |
 | Automatic sync interval | Minutes between syncs; `0` disables automatic sync |
 | Sync on startup | Runs one sync when Obsidian opens |
 | Excluded paths | Raw `.gitignore` rules at the vault root; edits take effect on the next sync |
@@ -108,7 +108,7 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 | 用户名 | 仓库 URL 中的用户或组织名 |
 | 仓库名 | 用于保存 vault 的私有仓库 |
 | 分支 | Gitee 默认 `master`，GitHub 默认 `main` |
-| 令牌 | 对应平台的私人访问令牌 |
+| 令牌 | 已保存的私人访问令牌。点击「选择秘钥」添加或选择，点击「测试」验证是否可用。 |
 | 自动同步间隔 | 同步间隔分钟数，`0` 表示关闭 |
 | 启动时同步 | Obsidian 打开后执行一次同步 |
 | 排除路径 | vault 根目录 `.gitignore` 原始规则，下次同步时生效 |
@@ -139,5 +139,5 @@ cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
 
 - 大型 vault 首次同步会逐文件生成 commit，可能受到平台 API 限流影响。
 - 建议将大附件放入排除目录，单文件尽量保持在 50 MB 以下。
-- 令牌存放在 `.obsidian/plugins/gitee-sync-plus/data.json`，使用其他工具备份 vault 时请排除此文件。
+- 令牌存入 Obsidian 钥匙串（设置 → 钥匙串），不再保存在 `data.json` 中。使用其他工具备份 vault 时无需特别排除令牌。
 - 插件管理仓库后，不要同时把同一个 vault 手动推送到相同仓库。

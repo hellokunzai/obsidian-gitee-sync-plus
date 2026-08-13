@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
 import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./GitPanelView";
 import { DIFF_VIEW_TYPE, DiffView, setDiffPluginInstance } from "./DiffView";
 import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
+import { TokenManager } from "./token-manager";
 
 interface HashCacheEntry {
 	mtime: number;
@@ -24,17 +25,12 @@ interface PluginData {
 // synced by iCloud between devices, but the three-way merge base is device-local.
 const LOCAL_SYNC_STATE_KEY = "gitee-sync-plus-sync-state-v1";
 
-// Keychain IDs used with app.secretStorage. When available, the in-memory token
-// is restored from / written to the OS keychain, and data.json only stores an
-// empty string in the token field so the vault sync never carries the real value.
-const SECRET_GITEE = "gitee-sync-plus-gitee";
-const SECRET_GITHUB = "gitee-sync-plus-github";
-
 export default class CloudSyncPlugin extends Plugin {
 	settings: SyncSettings = { ...DEFAULT_SETTINGS };
 	syncState: Record<string, string> = {};
 	hashCache: Record<string, HashCacheEntry> = {};
 	gitIgnoreManager!: GitIgnoreManager;
+	tokenManager!: TokenManager;
 
 	private statusBar!: HTMLElement;
 	private syncing = false;
@@ -45,7 +41,9 @@ export default class CloudSyncPlugin extends Plugin {
 	private panelRibbonIcon?: HTMLElement;
 
 	async onload(): Promise<void> {
+		this.tokenManager = new TokenManager(this);
 		await this.loadPluginData();
+		await this.tokenManager.migrateLegacyTokens();
 		const l = messages();
 
 		this.gitIgnoreManager = new GitIgnoreManager(this.app.vault);
@@ -246,29 +244,20 @@ export default class CloudSyncPlugin extends Plugin {
 		if (this.settings.backend !== "gitee" && this.settings.backend !== "github") {
 			this.settings.backend = "gitee";
 		}
-		// Prefer the keychain value over the data.json placeholder. On mobile /
-		// pre-1.11.4 Obsidian there is no secretStorage, so data.json holds the
-		// only copy of the token.
-		if (this.app.secretStorage) {
-			try {
-				const gitee = this.app.secretStorage.getSecret(SECRET_GITEE);
-				const github = this.app.secretStorage.getSecret(SECRET_GITHUB);
-				if (gitee) this.settings.giteeToken = gitee;
-				if (github) this.settings.githubToken = github;
-			} catch {
-				/* keep whatever data.json provided */
-			}
-		}
 		this.syncState =
 			(this.app.loadLocalStorage(LOCAL_SYNC_STATE_KEY) as Record<string, string> | null) ?? {};
 		this.hashCache = data?.hashCache ?? {};
+
+		// Refresh in-memory tokens from the currently selected keychain keys.
+		await this.tokenManager.refreshInMemoryToken("gitee");
+		await this.tokenManager.refreshInMemoryToken("github");
 	}
 
 	/**
-	 * Called whenever the plugin has a chance to persist secrets. When the OS
-	 * keychain is available, the in-memory token is mirrored there and the
-	 * data.json copy is redacted (empty string) so the vault sync never carries
-	 * the real token. Returns true when at least one token was written.
+	 * Persist plugin settings. When the Obsidian keychain is available, the
+	 * in-memory token is kept out of data.json so the vault sync never carries
+	 * the real value. On mobile / pre-1.11.4 Obsidian without secretStorage,
+	 * the token is persisted in data.json as a fallback.
 	 */
 	async savePluginData(): Promise<void> {
 		this.app.saveLocalStorage(LOCAL_SYNC_STATE_KEY, this.syncState);
@@ -277,19 +266,9 @@ export default class CloudSyncPlugin extends Plugin {
 			...this.settings,
 			// When the keychain is available, blank the on-disk token so the
 			// vault sync cannot leak it. The in-memory value stays intact.
-			giteeToken: ss && this.settings.giteeToken ? "" : this.settings.giteeToken,
-			githubToken: ss && this.settings.githubToken ? "" : this.settings.githubToken,
+			giteeToken: ss ? "" : this.settings.giteeToken,
+			githubToken: ss ? "" : this.settings.githubToken,
 		};
-		if (ss) {
-			try {
-				if (this.settings.giteeToken) ss.setSecret(SECRET_GITEE, this.settings.giteeToken);
-				if (this.settings.githubToken) ss.setSecret(SECRET_GITHUB, this.settings.githubToken);
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : String(e);
-				new Notice(messages().keychainMigrateFailed(msg), 8000);
-				// Fall through and persist as-is so the user is not locked out.
-			}
-		}
 		const data: PluginData = { settings: persist, hashCache: this.hashCache };
 		await this.saveData(data);
 		this.notifyGitPanelsOfSettingsChange();
@@ -297,28 +276,12 @@ export default class CloudSyncPlugin extends Plugin {
 
 	/**
 	 * One-shot helper that moves any plaintext token still living in data.json
-	 * into the OS keychain. Safe to call repeatedly: if the keychain is missing
-	 * or there is nothing to migrate, this is a no-op.
+	 * into the Obsidian keychain under the legacy key names. Safe to call
+	 * repeatedly: if the keychain is missing or there is nothing to migrate,
+	 * this is a no-op.
 	 */
 	async migrateTokensToKeychain(): Promise<boolean> {
-		const ss = this.app.secretStorage;
-		if (!ss) return false;
-		const raw = (await this.loadData()) as Partial<PluginData> | null;
-		const disk: Partial<SyncSettings> = raw?.settings ?? {};
-		const pendingGitee = disk.giteeToken ?? "";
-		const pendingGithub = disk.githubToken ?? "";
-		if (!pendingGitee && !pendingGithub) return false;
-		try {
-			if (pendingGitee) ss.setSecret(SECRET_GITEE, pendingGitee);
-			if (pendingGithub) ss.setSecret(SECRET_GITHUB, pendingGithub);
-		} catch (e) {
-			const msg = e instanceof Error ? e.message : String(e);
-			new Notice(messages().keychainMigrateFailed(msg), 8000);
-			return false;
-		}
-		await this.savePluginData();
-		new Notice(messages().keychainMigrated);
-		return true;
+		return this.tokenManager.migrateLegacyTokens();
 	}
 
 	/** Notify all open Git panels that settings have changed so they update their target label and refresh. */

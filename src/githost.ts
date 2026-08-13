@@ -392,6 +392,11 @@ export class GitHostBackend implements StorageBackend {
 	}
 }
 
+/** Verify that a token can access the given repository by fetching its branches. */
+export async function testToken(host: GitHost, owner: string, repo: string, token: string): Promise<void> {
+	await fetchBranches(host, owner, repo, token);
+}
+
 /** Fetch branch list from a Gitee or GitHub repository. */
 export async function fetchBranches(
 	host: GitHost,

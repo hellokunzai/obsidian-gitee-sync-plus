@@ -1,7 +1,8 @@
-import { App, DropdownComponent, PluginSettingTab, Setting } from "obsidian";
+import { App, DropdownComponent, Modal, Notice, PluginSettingTab, setIcon, Setting } from "obsidian";
 import { messages } from "./i18n";
 import type CloudSyncPlugin from "./main";
-import { fetchBranches } from "./githost";
+import { fetchBranches, testToken } from "./githost";
+import { TokenManager } from "./token-manager";
 
 interface BranchCache {
 	branches: string[];
@@ -44,11 +45,13 @@ export interface SyncSettings {
 	giteeRepo: string;
 	giteeBranch: string;
 	giteeToken: string;
+	giteeTokenProfile: string;
 	/* GitHub */
 	githubOwner: string;
 	githubRepo: string;
 	githubBranch: string;
 	githubToken: string;
+	githubTokenProfile: string;
 	/* common */
 	autoSyncMinutes: number;
 	syncOnStart: boolean;
@@ -66,10 +69,12 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	giteeRepo: "",
 	giteeBranch: "master",
 	giteeToken: "",
+	giteeTokenProfile: "",
 	githubOwner: "",
 	githubRepo: "",
 	githubBranch: "main",
 	githubToken: "",
+	githubTokenProfile: "",
 	autoSyncMinutes: 0,
 	syncOnStart: false,
 	debugLog: false,
@@ -83,9 +88,11 @@ export class SyncSettingTab extends PluginSettingTab {
 		"gitee" | "github",
 		{ setting: Setting; dropdown: DropdownComponent; host: "gitee" | "github" }
 	>();
+	private tokenManager: TokenManager;
 
 	constructor(app: App, private plugin: CloudSyncPlugin) {
 		super(app, plugin);
+		this.tokenManager = plugin.tokenManager;
 	}
 
 	async display(): Promise<void> {
@@ -124,25 +131,7 @@ export class SyncSettingTab extends PluginSettingTab {
 			);
 
 		if (s.backend === "gitee") {
-			new Setting(containerEl)
-				.setName(l.settingsGiteeToken)
-				.setDesc(
-					hasKeychain
-						? `${l.settingsGiteeTokenDesc} ${l.tokenStoredInKeychain}`
-						: l.settingsGiteeTokenDesc
-				)
-.addText((t) => {
-				t.inputEl.type = "password";
-				// Typing updates the in-memory value only; the keychain mirror (and
-				// the redacted data.json copy) is written once when the field loses
-				// focus, not on every keystroke.
-				t.setValue(s.giteeToken).onChange(async (v) => {
-					s.giteeToken = v.trim();
-				});
-				t.inputEl.addEventListener("blur", () => {
-					void save();
-				});
-			});
+			this.renderTokenSetting(containerEl, "gitee", l.settingsGiteeToken, l.settingsGiteeTokenDesc);
 
 			new Setting(containerEl)
 				.setName(l.settingsGiteeOwner)
@@ -178,25 +167,7 @@ export class SyncSettingTab extends PluginSettingTab {
 				}
 			);
 		} else {
-			new Setting(containerEl)
-				.setName(l.settingsGithubToken)
-				.setDesc(
-					hasKeychain
-						? `${l.settingsGithubTokenDesc} ${l.tokenStoredInKeychain}`
-						: l.settingsGithubTokenDesc
-				)
-.addText((t) => {
-				t.inputEl.type = "password";
-				// Typing updates the in-memory value only; the keychain mirror (and
-				// the redacted data.json copy) is written once when the field loses
-				// focus, not on every keystroke.
-				t.setValue(s.githubToken).onChange(async (v) => {
-					s.githubToken = v.trim();
-				});
-				t.inputEl.addEventListener("blur", () => {
-					void save();
-				});
-			});
+			this.renderTokenSetting(containerEl, "github", l.settingsGithubToken, l.settingsGithubTokenDesc);
 
 			new Setting(containerEl)
 				.setName(l.settingsGithubOwner)
@@ -318,6 +289,60 @@ export class SyncSettingTab extends PluginSettingTab {
 					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
 				});
 			});
+	}
+
+	private renderTokenSetting(
+		containerEl: HTMLElement,
+		host: "gitee" | "github",
+		name: string,
+		desc: string
+	): void {
+		const l = messages();
+		const setting = new Setting(containerEl).setName(name).setDesc(desc);
+		const activeKey = this.tokenManager.getActiveKey(host);
+
+		setting.addButton((b) =>
+			b
+				.setButtonText(l.selectToken)
+				.setTooltip(activeKey || l.selectToken)
+				.onClick(() => {
+					new TokenSelectModal(this.app, this.plugin, host, () => this.display()).open();
+				})
+		);
+
+		setting.addButton((b) =>
+			b
+				.setButtonText(l.testToken)
+				.setCta()
+				.onClick(async () => {
+					const key = this.tokenManager.getActiveKey(host);
+					if (!key) {
+						new Notice(l.tokenNoTokenSelected);
+						return;
+					}
+					const token = await this.tokenManager.getToken(key);
+					if (!token) {
+						new Notice(l.tokenNoTokenSelected);
+						return;
+					}
+					const owner = host === "gitee" ? this.plugin.settings.giteeOwner : this.plugin.settings.githubOwner;
+					const repo = host === "gitee" ? this.plugin.settings.giteeRepo : this.plugin.settings.githubRepo;
+					if (!owner || !repo) {
+						new Notice(host === "gitee" ? l.missingGiteeSettings : l.missingGithubSettings);
+						return;
+					}
+					b.setDisabled(true);
+					try {
+						await testToken(host, owner, repo, token);
+						new Notice(l.tokenTestSuccess);
+					} catch (e: any) {
+						const msg = e instanceof Error ? e.message : String(e);
+						new Notice(l.tokenTestFailed(msg), 8000);
+					} finally {
+						b.setDisabled(false);
+					}
+				})
+		);
 	}
 
 	private createSectionHeader(containerEl: HTMLElement, title: string): void {
@@ -456,5 +481,233 @@ export class SyncSettingTab extends PluginSettingTab {
 		} catch {
 			widget.setting.setDesc(messages().settingsBranchLoadFailed);
 		}
+	}
+}
+
+class TokenSelectModal extends Modal {
+	private selectedName: string | null;
+	private searchQuery = "";
+	private showAddForm = false;
+	private visibleTokens = new Set<string>();
+	private secrets: string[] = [];
+	private listContainer!: HTMLElement;
+	private addForm!: HTMLElement;
+	private nameInput!: HTMLInputElement;
+	private valueInput!: HTMLInputElement;
+
+	constructor(
+		app: App,
+		private plugin: CloudSyncPlugin,
+		private host: "gitee" | "github",
+		private onSave: () => void
+	) {
+		super(app);
+		this.selectedName = this.plugin.tokenManager.getActiveKey(host);
+	}
+
+	onOpen(): void {
+		this.modalEl.addClass("gitee-sync-plus-token-modal");
+
+		const { contentEl } = this;
+		contentEl.empty();
+		const l = messages();
+
+		contentEl.createEl("h2", { text: l.tokenSelectTitle, cls: "gitee-sync-plus-token-title" });
+
+		// Search box
+		const searchContainer = contentEl.createDiv({ cls: "gitee-sync-plus-token-search" });
+		const searchInput = searchContainer.createEl("input", {
+			type: "search",
+			placeholder: l.tokenSearchPlaceholder,
+			cls: "gitee-sync-plus-token-search-input",
+		});
+		searchInput.value = this.searchQuery;
+		searchInput.addEventListener("input", () => {
+			this.searchQuery = searchInput.value.trim().toLowerCase();
+			this.renderList();
+		});
+
+		// Add form (hidden by default)
+		this.addForm = contentEl.createDiv({ cls: "gitee-sync-plus-token-add-form" });
+		this.addForm.style.display = this.showAddForm ? "block" : "none";
+
+		this.nameInput = this.addForm.createEl("input", {
+			type: "text",
+			placeholder: l.tokenKeyId,
+			cls: "gitee-sync-plus-token-add-input",
+		});
+		this.valueInput = this.addForm.createEl("input", {
+			type: "password",
+			placeholder: l.tokenValue,
+			cls: "gitee-sync-plus-token-add-input",
+		});
+
+		const addFormButtons = this.addForm.createDiv({ cls: "gitee-sync-plus-token-add-buttons" });
+		const confirmAddBtn = addFormButtons.createEl("button", { text: l.tokenConfirmAdd, cls: "mod-cta" });
+		const cancelAddBtn = addFormButtons.createEl("button", { text: l.tokenCancel });
+
+		confirmAddBtn.addEventListener("click", () => {
+			void this.addSecret();
+		});
+		cancelAddBtn.addEventListener("click", () => {
+			this.toggleAddForm(false);
+		});
+
+		// List container
+		this.listContainer = contentEl.createDiv({ cls: "gitee-sync-plus-token-list" });
+
+		// Footer buttons
+		const footer = contentEl.createDiv({ cls: "gitee-sync-plus-token-footer" });
+		const addBtn = footer.createEl("button", { text: l.tokenAdd });
+		addBtn.addEventListener("click", () => {
+			this.toggleAddForm(true);
+			this.nameInput.focus();
+		});
+
+		const rightButtons = footer.createDiv({ cls: "gitee-sync-plus-token-footer-right" });
+		const saveBtn = rightButtons.createEl("button", { text: l.tokenSave, cls: "mod-cta" });
+		const cancelBtn = rightButtons.createEl("button", { text: l.tokenCancel });
+
+		saveBtn.addEventListener("click", () => {
+			void this.save();
+		});
+		cancelBtn.addEventListener("click", () => {
+			this.close();
+		});
+
+		this.scope.register([], "Escape", () => this.close());
+
+		// Load the actual keychain entries and then render.
+		this.renderList();
+		void this.loadSecrets();
+	}
+
+	private async loadSecrets(): Promise<void> {
+		this.secrets = await this.plugin.tokenManager.listSecrets();
+		this.renderList();
+	}
+
+	onClose(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+
+	private toggleAddForm(show: boolean): void {
+		this.showAddForm = show;
+		this.addForm.style.display = show ? "block" : "none";
+		if (!show) {
+			this.nameInput.value = "";
+			this.valueInput.value = "";
+		}
+	}
+
+	private renderList(): void {
+		const l = messages();
+		this.listContainer.empty();
+		const keys = this.secrets.filter((k) => k.toLowerCase().includes(this.searchQuery));
+
+		if (keys.length === 0) {
+			this.listContainer.createDiv({
+				text: this.searchQuery ? l.tokenNoMatch : l.tokenEmpty,
+				cls: "gitee-sync-plus-token-empty",
+			});
+			return;
+		}
+
+		for (const key of keys) {
+			const isSelected = this.selectedName === key;
+			const item = this.listContainer.createDiv({ cls: "gitee-sync-plus-token-item" });
+			if (isSelected) item.addClass("is-selected");
+
+			const left = item.createDiv({ cls: "gitee-sync-plus-token-item-left" });
+			const radio = left.createEl("input", { type: "radio", value: key });
+			radio.name = "token-select";
+			radio.checked = isSelected;
+			radio.addEventListener("change", () => {
+				this.selectedName = key;
+				this.renderList();
+			});
+
+			left.createSpan({ text: key, cls: "gitee-sync-plus-token-name" });
+
+			if (isSelected) {
+				left.createSpan({ text: l.tokenSelected, cls: "gitee-sync-plus-token-badge" });
+			}
+
+			const actions = item.createDiv({ cls: "gitee-sync-plus-token-actions" });
+
+			// Eye toggle
+			const isVisible = this.visibleTokens.has(key);
+			const eyeBtn = actions.createEl("button", { cls: "gitee-sync-plus-token-icon-btn" });
+			setIcon(eyeBtn, isVisible ? "eye-off" : "eye");
+			eyeBtn.addEventListener("click", () => {
+				if (isVisible) {
+					this.visibleTokens.delete(key);
+				} else {
+					this.visibleTokens.add(key);
+				}
+				this.renderList();
+			});
+
+			// Delete button
+			const delBtn = actions.createEl("button", { cls: "gitee-sync-plus-token-icon-btn" });
+			setIcon(delBtn, "trash-2");
+			delBtn.addEventListener("click", () => {
+				if (confirm(l.tokenDeleteConfirm(key))) {
+					void this.deleteSecret(key);
+				}
+			});
+
+			// Show token value inline when visible
+			if (isVisible) {
+				void this.plugin.tokenManager.getToken(key).then((v) => {
+					const valueEl = item.createDiv({ cls: "gitee-sync-plus-token-value" });
+					valueEl.setText(v ?? "");
+				});
+			}
+		}
+	}
+
+	private async addSecret(): Promise<void> {
+		const l = messages();
+		const rawName = this.nameInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+		const value = this.valueInput.value.trim();
+		if (!rawName) {
+			new Notice(l.tokenNameRequired);
+			return;
+		}
+		if (!value) {
+			new Notice(l.tokenValueRequired);
+			return;
+		}
+		if (this.secrets.includes(rawName)) {
+			new Notice(l.tokenDuplicateName);
+			return;
+		}
+		try {
+			await this.plugin.tokenManager.setToken(rawName, value);
+			this.secrets.push(rawName);
+			this.selectedName = rawName;
+			this.toggleAddForm(false);
+			this.renderList();
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(l.tokenSaveFailed(msg), 8000);
+		}
+	}
+
+	private async deleteSecret(name: string): Promise<void> {
+		await this.plugin.tokenManager.deleteToken(name);
+		this.secrets = this.secrets.filter((k) => k !== name);
+		if (this.selectedName === name) {
+			this.selectedName = null;
+		}
+		this.renderList();
+	}
+
+	private async save(): Promise<void> {
+		await this.plugin.tokenManager.setActiveKey(this.host, this.selectedName);
+		this.onSave();
+		this.close();
 	}
 }

@@ -1,5 +1,20 @@
 # 更新日志
 
+## 1.1.0（2026-08-13）
+
+私人令牌改为通过「选择秘钥」对话框管理，并新增测试按钮。
+
+- 新增 `src/token-manager.ts`：封装 `app.secretStorage` 操作；对话框数据源改为 `listSecrets()` 返回的 Obsidian 钥匙串全部 key
+- `src/settings.ts`：
+  - 私人令牌/访问令牌输入框替换为「选择秘钥」+「测试」两个按钮
+  - 新增 `TokenSelectModal`：直接列出 Obsidian 钥匙串中的密钥，支持搜索、单选、添加新密钥、查看/隐藏、删除、保存
+  - 测试按钮使用当前选中的密钥拉取分支列表，验证令牌是否可用
+- `src/main.ts`：初始化 `TokenManager`；加载数据时从当前选中的 key 恢复内存中的 token，并自动把旧版单令牌设置迁移到钥匙串
+- `src/githost.ts`：新增 `testToken()`，复用 `fetchBranches()` 验证令牌
+- `src/i18n.ts`：新增选择秘钥、测试、添加/删除秘钥等相关文案（中/英）
+- `styles.css`：新增「选择秘钥」对话框样式
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.0`
+
 ## 1.0.3（2026-08-11）
 
 Git 面板增强与若干易用性修复。
