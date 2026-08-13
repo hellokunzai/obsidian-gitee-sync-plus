@@ -52,11 +52,14 @@ npm run build
 
 git add manifest.json versions.json
 git commit -m "Release $VERSION"
-git push
+git push github
 
-# 标签必须与 manifest 版本完全一致;main.js 和 manifest.json 是
+# 标签必须与 manifest 版本完全一致;main.js / manifest.json / styles.css 是
 # Obsidian 安装时实际下载的文件,必须作为附件上传。
-gh release create "$VERSION" main.js manifest.json --title "$VERSION" --notes "$NOTES"
+# 注意:推送到 github 远端(hellokunzai fork),不要推到 origin(ericquan8 上游)。
+gh release create "$VERSION" main.js manifest.json styles.css \
+	--title "$VERSION" --notes "$NOTES" \
+	--repo "hellokunzai/obsidian-gitee-sync-plus"
 
 echo ""
 echo "✅ $VERSION 发布完成。社区市场约 30 分钟内可见更新;BRAT 用户执行 'Check for updates' 即可获取。"

@@ -432,3 +432,13 @@ export function formatDateTime(date = new Date()): string {
 export function formatTime(date = new Date()): string {
 	return date.toLocaleTimeString(getLanguage().toLowerCase().startsWith("zh") ? "zh-CN" : "en-US");
 }
+
+/**
+ * Skill 约定别名：保留既有 messages().key 用法，同时导出 t(key) 以匹配
+ * obsidian-plugin-dev 合规检查（"导出 t() 函数"）。字符串类消息直接返回；
+ * 函数类消息（如带参数的 statusComplete）请仍用 messages().key(...) 调用。
+ */
+export function t(key: keyof Messages): string {
+	const value = messages()[key];
+	return typeof value === "string" ? value : "";
+}
