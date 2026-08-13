@@ -1,6 +1,6 @@
 # 更新日志
 
-## 1.1.0（2026-08-13）
+## 1.0.6（2026-08-13）
 
 私人令牌改为通过「选择秘钥」对话框管理，并新增测试按钮。
 
@@ -13,7 +13,7 @@
 - `src/githost.ts`：新增 `testToken()`，复用 `fetchBranches()` 验证令牌
 - `src/i18n.ts`：新增选择秘钥、测试、添加/删除秘钥等相关文案（中/英）
 - `styles.css`：新增「选择秘钥」对话框样式
-- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.0`
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.0.6`
 
 ## 1.0.3（2026-08-11）
 
