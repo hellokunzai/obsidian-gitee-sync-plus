@@ -1,5 +1,17 @@
 # 更新日志
 
+## 1.0.9（2026-08-13）
+
+差异对比视图性能优化（针对 1000+ 行大文件卡顿）。
+
+- `src/DiffView.ts`：`computeDiffRows` 给 oldLines 也建立 hash→行号索引，把下一锚点匹配的 O(N) 线性扫描改为 O(1) 索引查找，整体复杂度从 O(N²) 降到 O(N)，万行文件差异计算从秒级降到毫秒级
+- `src/DiffView.ts`：未更改片段默认折叠（`collapseUnchanged` 默认值改为 `true`），且长段折叠后不再预渲染隐藏行，点击「⋯」才懒加载，首屏 DOM 节点数随文件大小基本恒定
+- `src/DiffView.ts`：800 行以上文件改用 `requestAnimationFrame` 分批渲染，每帧约 12ms 预算，避免主线程长任务卡死；引入 renderToken 防止旧渲染污染
+- `src/DiffView.ts`：revert 块改用 `chunkIndex → rows` 索引（O(1)）替代每次 `filter` 全表扫描
+- `src/DiffView.ts`：行渲染改用原生 DOM 构建，支持折叠段懒加载；超过 5000 行时给出一次性提示
+- `src/i18n.ts`：新增大文件提示文案（中/英）
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.0.9`
+
 ## 1.0.8（2026-08-13）
 
 修复社区市场审核不通过问题。

@@ -1,7 +1,7 @@
 {
 	"id": "gitee-sync-plus",
 	"name": "Gitee Sync Plus",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"minAppVersion": "1.11.4",
 	"description": "Sync your vault to a Gitee or GitHub repository.",
 	"author": "hellokunzai",
