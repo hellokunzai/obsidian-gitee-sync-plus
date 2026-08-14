@@ -288,7 +288,8 @@ export class SyncSettingTab extends PluginSettingTab {
 				t.inputEl.addEventListener("blur", async () => {
 					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
 				});
-			});
+			})
+			.settingEl.addClass('gitee-sync-plus-gitignore-setting');
 	}
 
 	private renderTokenSetting(

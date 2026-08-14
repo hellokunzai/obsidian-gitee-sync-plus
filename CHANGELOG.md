@@ -1,5 +1,14 @@
 # 更新日志
 
+## 1.1.0（2026-08-14）
+
+设置面板「排除目录」输入框布局优化。
+
+- `src/settings.ts`：给「排除目录」Setting 加自定义 class `gitee-sync-plus-gitignore-setting`
+- `styles.css`：强制该项为纵向布局（`flex-direction: column` + `align-items: stretch`），控件区 `width: 100%`，textarea `width: 100%; min-width: 0; box-sizing: border-box`（移除原 `min-width: 400px`）
+- 效果：PC 与移动端均「名称+描述在上、textarea 独占一行在下」，不再在窄屏乱折行或宽屏并排
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.0`
+
 ## 1.0.9（2026-08-13）
 
 差异对比视图性能优化（针对 1000+ 行大文件卡顿）。
