@@ -23,6 +23,7 @@ const DEFAULT_GITIGNORE = [
 	"# Obsidian workspace layout files, stores panel and tab states. Do not sync across different devices",
 	".obsidian/workspace.json",
 	".obsidian/workspace-mobile.json",
+	".obsidian/plugins/gitee-sync-plus/data.json",
 ].join("\n");
 
 /**
