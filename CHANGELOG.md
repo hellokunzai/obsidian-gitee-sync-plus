@@ -1,5 +1,24 @@
 # 更新日志
 
+## 1.1.2（2026-08-18）
+
+文档修正（无代码改动）。
+
+- `CHANGELOG.md`：补全缺失的 `1.1.1` 条目
+- `README.md`：英文「Limitations and security」中令牌存储描述与中文不一致，已更正为「令牌存入 Obsidian 钥匙串（Settings → Secrets），不再保存在 `data.json`，备份 vault 时无需特别排除」
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.2`
+
+## 1.1.1（2026-08-18）
+
+同步健壮性与差异视图修复。
+
+- `src/sync.ts`：`executePush` 将单文件失败隔离，不再中断整批；已成功的文件照常写入 `syncState`，重试只触碰真正失败的文件
+- `src/githost.ts`：`upload` 对 Gitee 新建冲突（`already exists`/409）与 GitHub `422`（陈旧 manifest、无 sha 的 PUT）做幂等处理——远端内容一致当成功，否则带远端 sha 重试 `PUT`；`fileSha()` 返回 null 时回退抛出原始错误，避免掩盖真实校验失败
+- `src/githost.ts`：`batchCommitGitee` 把 `action` 拆分为每块最多 100 个的小请求以避开网关超时（502/504）；任一块撞 create 冲突或 400「文件新建失败」时，回退为逐文件提交复用幂等逻辑
+- `src/DiffView.ts`：差异内容仅换行符不同时，渲染「内容一致」提示并提供「标记为已同步」与「仍要显示差异」；回滚按钮仅渲染在本地版本侧
+- `src/i18n.ts`：新增 `pushPartiallyFailed`、`diffIdenticalHint`、`diffMarkSynced`、`diffShowAnyway`、`diffMarkedAsSynced`、`diffMarkSyncedFailed`
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.1`
+
 ## 1.1.0（2026-08-14）
 
 设置面板「排除目录」输入框布局优化。

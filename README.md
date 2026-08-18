@@ -69,7 +69,7 @@ If a downloaded folder is visible but a file with a non-standard extension is no
 
 - The first sync of a large vault creates one commit per file and may be limited by platform API quotas.
 - Keep large attachments in an excluded folder. Individual files should preferably remain below 50 MB.
-- Tokens are stored in `.obsidian/plugins/gitee-sync-plus/data.json`. Exclude this file when backing up the vault with other tools.
+- Tokens are stored in the Obsidian Secret Storage (Settings → Secrets), no longer in `data.json`. No need to exclude anything when backing up the vault with other tools.
 - Do not manually push the same vault to the same repository while the plugin manages it.
 
 ## 中文
