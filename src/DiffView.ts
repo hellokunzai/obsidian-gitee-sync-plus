@@ -264,14 +264,18 @@ export class DiffView extends ItemView {
 			let afterLabel = l.diffRightRemote;
 
 			switch (kind) {
-				case "local-mod": {
-					const { data } = await backend.download(path);
-					beforeText = this.decodeText(data);
-					afterText = await this.readLocalText(path);
-					beforeLabel = l.diffLeftRemote;
-					afterLabel = l.diffRightLocal;
-					break;
+			case "local-mod": {
+				const { data, hash: remoteHash } = await backend.download(path);
+				beforeText = this.decodeText(data);
+				afterText = await this.readLocalText(path);
+				beforeLabel = l.diffLeftRemote;
+				afterLabel = l.diffRightLocal;
+				if (this.textsAreEffectivelyEqual(beforeText, afterText)) {
+					this.renderIdenticalDiff(path, remoteHash, beforeText, afterText, beforeLabel, afterLabel);
+					return;
 				}
+				break;
+			}
 				case "local-add": {
 					afterText = await this.readLocalText(path);
 					beforeLabel = l.diffLeftEmpty;
@@ -285,14 +289,18 @@ export class DiffView extends ItemView {
 					afterLabel = l.diffRightEmpty;
 					break;
 				}
-				case "remote-mod": {
-					beforeText = await this.readLocalText(path);
-					const { data } = await backend.download(path);
-					afterText = this.decodeText(data);
-					beforeLabel = l.diffLeftLocal;
-					afterLabel = l.diffRightRemote;
-					break;
+			case "remote-mod": {
+				beforeText = await this.readLocalText(path);
+				const { data, hash: remoteHash } = await backend.download(path);
+				afterText = this.decodeText(data);
+				beforeLabel = l.diffLeftLocal;
+				afterLabel = l.diffRightRemote;
+				if (this.textsAreEffectivelyEqual(beforeText, afterText)) {
+					this.renderIdenticalDiff(path, remoteHash, beforeText, afterText, beforeLabel, afterLabel);
+					return;
 				}
+				break;
+			}
 				case "remote-del": {
 					beforeText = await this.readLocalText(path);
 					beforeLabel = l.diffLeftLocal;
@@ -381,6 +389,69 @@ export class DiffView extends ItemView {
 		// slower (but still responsive) render.
 		if (rows.length > LARGE_FILE_ROWS) {
 			new Notice(messages().diffLargeFileHint(rows.length));
+		}
+	}
+
+	/**
+	 * True when the two texts differ only by line endings (CRLF vs LF) or are
+	 * exactly equal. The sync engine normalizes CRLF before hashing on the local
+	 * side, but the remote manifest stores the raw git blob SHA; a file uploaded
+	 * with CRLF therefore has a different remote hash while being textually
+	 * identical. Without this guard the diff view would show two identical panes
+	 * for a file the panel lists as changed.
+	 */
+	private textsAreEffectivelyEqual(a: string, b: string): boolean {
+		return normalizeLineEndings(a) === normalizeLineEndings(b);
+	}
+
+	/**
+	 * Renders a friendly placeholder when the local and remote contents are
+	 * textually identical but the sync state says the file changed. Offers a
+	 * one-click way to realign the local sync state with the remote hash.
+	 */
+	private renderIdenticalDiff(
+		path: string,
+		remoteHash: string,
+		beforeText: string,
+		afterText: string,
+		beforeLabel: string,
+		afterLabel: string
+	): void {
+		if (!this.diffContentEl) return;
+		this.diffContentEl.empty();
+		const l = messages();
+
+		const container = this.diffContentEl.createDiv("gitee-sync-plus-diff-identical");
+		container.createEl("p", {
+			text: l.diffIdenticalHint,
+			cls: "gitee-sync-plus-diff-identical-hint",
+		});
+
+		const actions = container.createDiv("gitee-sync-plus-diff-identical-actions");
+		const syncBtn = actions.createEl("button", {
+			text: l.diffMarkSynced,
+			cls: "mod-cta",
+		});
+		syncBtn.addEventListener("click", () => void this.markAsSynced(path, remoteHash));
+
+		const showBtn = actions.createEl("button", {
+			text: l.diffShowAnyway,
+			cls: "gitee-sync-plus-diff-identical-secondary",
+		});
+		showBtn.addEventListener("click", () =>
+			void this.renderDiff(path, beforeText, afterText, beforeLabel, afterLabel)
+		);
+	}
+
+	private async markAsSynced(path: string, remoteHash: string): Promise<void> {
+		const l = messages();
+		try {
+			this.plugin.syncState[path] = remoteHash;
+			await this.plugin.savePluginData();
+			new Notice(l.diffMarkedAsSynced(path));
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			new Notice(l.diffMarkSyncedFailed(msg), 8000);
 		}
 	}
 
@@ -868,6 +939,11 @@ function splitLines(text: string): string[] {
 	if (text === "") return [];
 	// Keep line endings out of the diff display.
 	return text.split(/\r?\n/);
+}
+
+/** Replaces CRLF with LF so two textually identical files compare equal. */
+function normalizeLineEndings(text: string): string {
+	return text.replace(/\r\n/g, "\n");
 }
 
 /**

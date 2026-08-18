@@ -501,6 +501,39 @@
 	margin-top: 16px;
 }
 
+/* ===== Identical-content hint shown in the diff view ===== */
+.gitee-sync-plus-diff-identical {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	padding: 32px 24px;
+	text-align: center;
+	color: var(--text-muted);
+}
+.gitee-sync-plus-diff-identical-hint {
+	max-width: 480px;
+	line-height: 1.5;
+	margin: 0;
+}
+.gitee-sync-plus-diff-identical-actions {
+	display: flex;
+	gap: 10px;
+}
+.gitee-sync-plus-diff-identical-secondary {
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	padding: 6px 14px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.gitee-sync-plus-diff-identical-secondary:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
 /* ===== Token select modal ===== */
 .gitee-sync-plus-token-modal {
 	width: 520px !important;
