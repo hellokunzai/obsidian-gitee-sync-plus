@@ -71,6 +71,9 @@ export class DiffView extends ItemView {
 		beforeLabel: string;
 		afterLabel: string;
 	} | null = null;
+	/** Which side of the current diff holds the local version. Used to place
+	 * revert buttons only on the local side. */
+	private localSide: "before" | "after" = "after";
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -262,6 +265,7 @@ export class DiffView extends ItemView {
 			let afterText = "";
 			let beforeLabel = l.diffLeftLocal;
 			let afterLabel = l.diffRightRemote;
+			let localSide: "before" | "after" = "after";
 
 			switch (kind) {
 			case "local-mod": {
@@ -270,6 +274,7 @@ export class DiffView extends ItemView {
 				afterText = await this.readLocalText(path);
 				beforeLabel = l.diffLeftRemote;
 				afterLabel = l.diffRightLocal;
+				localSide = "after";
 				if (this.textsAreEffectivelyEqual(beforeText, afterText)) {
 					this.renderIdenticalDiff(path, remoteHash, beforeText, afterText, beforeLabel, afterLabel);
 					return;
@@ -280,6 +285,7 @@ export class DiffView extends ItemView {
 					afterText = await this.readLocalText(path);
 					beforeLabel = l.diffLeftEmpty;
 					afterLabel = l.diffRightLocal;
+					localSide = "after";
 					break;
 				}
 				case "local-del": {
@@ -287,6 +293,7 @@ export class DiffView extends ItemView {
 					beforeText = this.decodeText(data);
 					beforeLabel = l.diffLeftRemote;
 					afterLabel = l.diffRightEmpty;
+					localSide = "after";
 					break;
 				}
 			case "remote-mod": {
@@ -295,6 +302,7 @@ export class DiffView extends ItemView {
 				afterText = this.decodeText(data);
 				beforeLabel = l.diffLeftLocal;
 				afterLabel = l.diffRightRemote;
+				localSide = "before";
 				if (this.textsAreEffectivelyEqual(beforeText, afterText)) {
 					this.renderIdenticalDiff(path, remoteHash, beforeText, afterText, beforeLabel, afterLabel);
 					return;
@@ -305,11 +313,12 @@ export class DiffView extends ItemView {
 					beforeText = await this.readLocalText(path);
 					beforeLabel = l.diffLeftLocal;
 					afterLabel = l.diffRightEmpty;
+					localSide = "before";
 					break;
 				}
 			}
 
-			await this.renderDiff(path, beforeText, afterText, beforeLabel, afterLabel);
+			await this.renderDiff(path, beforeText, afterText, beforeLabel, afterLabel, localSide);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			console.error("[gitee-sync-plus] diff load failed", e);
@@ -344,7 +353,8 @@ export class DiffView extends ItemView {
 		beforeText: string,
 		afterText: string,
 		beforeLabel: string,
-		afterLabel: string
+		afterLabel: string,
+		localSide: "before" | "after" = "after"
 	): Promise<void> {
 		if (!this.diffContentEl) return;
 		this.diffContentEl.empty();
@@ -360,6 +370,7 @@ export class DiffView extends ItemView {
 		this.currentBeforeText = beforeText;
 		this.currentAfterText = afterText;
 		this.lastDiff = { path, beforeText, afterText, beforeLabel, afterLabel };
+		this.localSide = localSide;
 
 		this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
 		this.diffContentEl.addClass(`layout-${this.layout}`);
@@ -582,8 +593,6 @@ export class DiffView extends ItemView {
 		tr.append(leftNum, leftCell, rightNum, rightCell);
 
 		if (chunkIndex !== undefined) {
-			// Place a revert button on whichever side actually shows content for this row:
-			// delete -> left (before), insert -> right (after), change -> both.
 			const attach = (numCell: HTMLElement) => {
 				const revertBtn = document.createElement("button");
 				revertBtn.textContent = "↩";
@@ -595,9 +604,10 @@ export class DiffView extends ItemView {
 				});
 				numCell.appendChild(revertBtn);
 			};
-			if (row.oldLine > 0) attach(leftNum);
-			if (row.newLine > 0) attach(rightNum);
+			if (this.localSide === "before" && row.oldLine > 0) attach(leftNum);
+			if (this.localSide === "after" && row.newLine > 0) attach(rightNum);
 		}
+
 		return tr;
 	}
 
@@ -761,9 +771,10 @@ export class DiffView extends ItemView {
 				});
 				numCell.appendChild(revertBtn);
 			};
-			if (row.oldLine > 0) attach(beforeNum);
-			if (row.newLine > 0) attach(afterNum);
+			if (this.localSide === "before" && row.oldLine > 0) attach(beforeNum);
+			if (this.localSide === "after" && row.newLine > 0) attach(afterNum);
 		}
+
 		return { before: beforeTr, after: afterTr };
 	}
 
