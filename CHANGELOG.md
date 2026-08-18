@@ -1,5 +1,19 @@
 # 更新日志
 
+## 1.1.4（2026-08-18）
+
+文档补充（无代码改动）。
+
+- `CHANGELOG.md`：补全缺失的 `1.1.3` 条目
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.4`
+
+## 1.1.3（2026-08-18）
+
+默认排除目录新增插件本地设置。
+
+- `src/gitignore.ts`：`DEFAULT_GITIGNORE` 末尾新增 `.obsidian/plugins/gitee-sync-plus/data.json`，新 vault 首次创建 `.gitignore` 时默认排除插件本地设置，避免令牌引用/密钥链映射被同步到远端
+- 版本号：`manifest.json` / `package.json` / `versions.json` → `1.1.3`
+
 ## 1.1.2（2026-08-18）
 
 文档修正（无代码改动）。
