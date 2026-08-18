@@ -109,6 +109,9 @@ function encodePath(path: string): string {
 	return path.split("/").map(encodeURIComponent).join("/");
 }
 
+/** Gitee's /commits endpoint can gateway-timeout on huge action arrays. Stay well below that. */
+const GITEE_BATCH_ACTION_LIMIT = 100;
+
 /**
  * Stores the vault as plain files in a Gitee or GitHub repository via their
  * (near-identical) contents/trees REST APIs. Every upload/delete is one
@@ -286,6 +289,22 @@ export class GitHostBackend implements StorageBackend {
 		return e.status === 409;
 	}
 
+	/** True for gateway/proxy errors where retrying with smaller requests may help. */
+	private isGatewayError(e: unknown): boolean {
+		return e instanceof GitHostError && (e.status === 502 || e.status === 503 || e.status === 504);
+	}
+
+	/**
+	 * True when Gitee's batch /commits endpoint returns a 400 because a single
+	 * "create" action could not be applied (e.g. "文件新建失败"). The whole chunk
+	 * is rejected, but replaying the same change per-file either resolves the
+	 * conflict idempotently (file already exists with identical content) or
+	 * surfaces the exact offending path instead of failing thousands of files.
+	 */
+	private isGiteeBatchCreateFailure(e: unknown): boolean {
+		return e instanceof GitHostError && e.status === 400 && /文件新建失败|新建失败/.test(e.message);
+	}
+
 	/** True when a GitHub PUT (no sha) failed because the file already exists remotely. */
 	private isGithubStaleCreate(e: unknown): boolean {
 		if (!(e instanceof GitHostError)) return false;
@@ -327,12 +346,30 @@ export class GitHostBackend implements StorageBackend {
 
 	/**
 	 * Gitee: POST /repos/{owner}/{repo}/commits — "提交多个文件变更".
-	 * A single API call that creates one commit with all file changes.
+	 *
+	 * Split large action arrays into chunks: Gitee's gateway/proxy times out
+	 * (502/504) when too many actions are submitted at once. Each chunk gets its
+	 * own commit. If a chunk still fails on a create conflict or gateway error,
+	 * fall back to per-file commits for that chunk only.
 	 */
 	private async batchCommitGitee(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void> {
 		const l = messages();
 		const commitMessage =
 			message && message.trim() ? message.trim() : l.commitBatch(files.length, deletes.length);
+		const changes: (BatchFileChange | BatchDelete)[] = [...files, ...deletes];
+		const chunks = this.chunkArray(changes, GITEE_BATCH_ACTION_LIMIT);
+		for (const chunk of chunks) {
+			const chunkFiles = chunk.filter((c): c is BatchFileChange => "data" in c);
+			const chunkDeletes = chunk.filter((c): c is BatchDelete => !("data" in c));
+			await this.batchCommitGiteeChunk(chunkFiles, chunkDeletes, commitMessage);
+		}
+	}
+
+	private async batchCommitGiteeChunk(
+		files: BatchFileChange[],
+		deletes: BatchDelete[],
+		commitMessage: string
+	): Promise<void> {
 		const actions: Record<string, unknown>[] = [];
 		for (const f of files) {
 			actions.push({
@@ -345,6 +382,7 @@ export class GitHostBackend implements StorageBackend {
 		for (const d of deletes) {
 			actions.push({ action: "delete", path: d.path });
 		}
+		if (actions.length === 0) return;
 		try {
 			await this.request("POST", `${this.repoBase}/commits`, {
 				branch: this.cfg.branch,
@@ -352,13 +390,17 @@ export class GitHostBackend implements StorageBackend {
 				actions,
 			});
 		} catch (e) {
-			// Gitee rejects the ENTIRE batch when a single "create" action hits a
-			// file that already exists on the host. Replay every change as
-			// individual file commits — the per-file upload/remove path already
-			// treats a create conflict as idempotent (identical content = success,
-			// otherwise a PUT update), so this recovers without losing local data
-			// and without the caller needing to retry the whole sync.
-			if (this.isCreateConflict(e)) {
+			// Gitee rejects the ENTIRE chunk when a single "create" action fails
+			// (already-existing file, "文件新建失败", etc.) or when the gateway
+			// itself times out. Replay only this chunk as individual file commits
+			// — the per-file upload/remove path already resolves create conflicts
+			// idempotently and makes much smaller requests, so it recovers from
+			// all of these cases without losing local data.
+			if (
+				this.isCreateConflict(e) ||
+				this.isGatewayError(e) ||
+				this.isGiteeBatchCreateFailure(e)
+			) {
 				await this.batchCommitFallback(files, deletes, commitMessage);
 				return;
 			}
@@ -468,6 +510,14 @@ export class GitHostBackend implements StorageBackend {
 				sha: newCommitSha,
 			});
 		}
+	}
+
+	private chunkArray<T>(arr: T[], size: number): T[][] {
+		const chunks: T[][] = [];
+		for (let i = 0; i < arr.length; i += size) {
+			chunks.push(arr.slice(i, i + size));
+		}
+		return chunks;
 	}
 
 	hashData(data: ArrayBuffer): Promise<string> {
