@@ -111,6 +111,12 @@ const en = {
 	previewTitle: "Sync preview (not executed)",
 	executionTitle: "Sync execution",
 	pathFailed: (path: string, message: string) => `Failed to process \"${path}\": ${message}`,
+	pushPartiallyFailed: (pushed: number, deletedRemote: number, failures: string[]) =>
+		`Sync finished with ${failures.length} file(s) not transferred ` +
+		`(uploaded ${pushed}, deleted remote ${deletedRemote}). ` +
+		`They will be retried on the next sync:\n` +
+		failures.slice(0, 20).map((f) => `- ${f}`).join("\n") +
+		(failures.length > 20 ? `\n… and ${failures.length - 20} more` : ""),
 	resultFailed: (message: string) => `Result: **Failed** — ${message}\n`,
 	completedCounts: (pulled: number, pushed: number, deletedLocal: number, deletedRemote: number) =>
 		`(Completed: downloaded ${pulled}, uploaded ${pushed}, deleted local ${deletedLocal}, ` +
@@ -320,6 +326,11 @@ const zh: typeof en = {
 	previewTitle: "同步预演（未执行）",
 	executionTitle: "同步执行",
 	pathFailed: (path, message) => `处理“${path}”失败：${message}`,
+	pushPartiallyFailed: (pushed, deletedRemote, failures) =>
+		`同步完成，但有 ${failures.length} 个文件未能传输（已上传 ${pushed}，已删除远端 ${deletedRemote}）。` +
+		`这些文件将在下次同步时自动重试：\n` +
+		failures.slice(0, 20).map((f) => `- ${f}`).join("\n") +
+		(failures.length > 20 ? `\n… 以及另外 ${failures.length - 20} 个` : ""),
 	resultFailed: (message) => `结果：**失败** — ${message}\n`,
 	completedCounts: (pulled, pushed, deletedLocal, deletedRemote) =>
 		`（已完成：下载 ${pulled}，上传 ${pushed}，删除本地 ${deletedLocal}，` +

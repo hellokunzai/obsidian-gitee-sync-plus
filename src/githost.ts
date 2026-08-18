@@ -237,7 +237,63 @@ export class GitHostBackend implements StorageBackend {
 		};
 		if (opts.remoteHash) body.sha = opts.remoteHash;
 		const method = this.isGithub || opts.remoteHash ? "PUT" : "POST";
-		await this.request(method, url, body);
+		try {
+			await this.request(method, url, body);
+		} catch (e) {
+			// A "create" that hits an already-existing file:
+			//  - Gitee: POST returns "already exists" (the file may already be created).
+			//  - GitHub: PUT without sha to an existing file returns 422 "'sha' wasn't
+			//    supplied" — the file was NOT created, so it needs the blob sha to update.
+			// We only reach here when we believed the file was new (!opts.remoteHash).
+			// Fetch the existing blob sha and retry as an update so the local content
+			// wins; identical content is treated as already-synced. fileSha() is the
+			// real gate — if nothing exists at that path we re-throw the original error.
+			if (
+				!opts.remoteHash &&
+				(this.isGithub ? this.isGithubStaleCreate(e) : this.isCreateConflict(e))
+			) {
+				const existingSha = await this.fileSha(path);
+				if (existingSha === opts.hash) return; // remote already holds identical content
+				if (existingSha) {
+					await this.request("PUT", url, { ...body, sha: existingSha });
+					return;
+				}
+				// No remote file but the create still errored — surface the original.
+			}
+			throw e;
+		}
+	}
+
+	/** Returns the current blob SHA of a remote file, or null if it does not exist. */
+	private async fileSha(path: string): Promise<string | null> {
+		try {
+			const resp = await this.request(
+				"GET",
+				`${this.repoBase}/contents/${encodePath(path)}?ref=${encodeURIComponent(this.cfg.branch)}`
+			);
+			return (resp.json as { sha?: string }).sha ?? null;
+		} catch (e) {
+			if (e instanceof GitHostError && (e.status === 404 || e.status === 409)) return null;
+			throw e;
+		}
+	}
+
+	/** True when a create (POST) failed because the target already exists on the host. */
+	private isCreateConflict(e: unknown): boolean {
+		if (!(e instanceof GitHostError)) return false;
+		if (/exist|已存在|duplicate|conflict|冲突/i.test(e.message)) return true;
+		// Gitee also reports this with a 409 even when the message text varies.
+		return e.status === 409;
+	}
+
+	/** True when a GitHub PUT (no sha) failed because the file already exists remotely. */
+	private isGithubStaleCreate(e: unknown): boolean {
+		if (!(e instanceof GitHostError)) return false;
+		// GitHub returns 422 with "'sha' wasn't supplied" (or "already exists")
+		// when a create hits an existing file. fileSha() further below is the real
+		// gate: if nothing exists at that path, the original error is re-thrown, so
+		// unrelated 422s (protected branch, invalid content) are never masked.
+		return e.status === 422 && /"sha".*suppl|already exist/i.test(e.message);
 	}
 
 	async remove(path: string, remoteHash?: string): Promise<void> {
@@ -275,6 +331,8 @@ export class GitHostBackend implements StorageBackend {
 	 */
 	private async batchCommitGitee(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void> {
 		const l = messages();
+		const commitMessage =
+			message && message.trim() ? message.trim() : l.commitBatch(files.length, deletes.length);
 		const actions: Record<string, unknown>[] = [];
 		for (const f of files) {
 			actions.push({
@@ -287,11 +345,48 @@ export class GitHostBackend implements StorageBackend {
 		for (const d of deletes) {
 			actions.push({ action: "delete", path: d.path });
 		}
-		await this.request("POST", `${this.repoBase}/commits`, {
-			branch: this.cfg.branch,
-			message: message && message.trim() ? message.trim() : l.commitBatch(files.length, deletes.length),
-			actions,
-		});
+		try {
+			await this.request("POST", `${this.repoBase}/commits`, {
+				branch: this.cfg.branch,
+				message: commitMessage,
+				actions,
+			});
+		} catch (e) {
+			// Gitee rejects the ENTIRE batch when a single "create" action hits a
+			// file that already exists on the host. Replay every change as
+			// individual file commits — the per-file upload/remove path already
+			// treats a create conflict as idempotent (identical content = success,
+			// otherwise a PUT update), so this recovers without losing local data
+			// and without the caller needing to retry the whole sync.
+			if (this.isCreateConflict(e)) {
+				await this.batchCommitFallback(files, deletes, commitMessage);
+				return;
+			}
+			throw e;
+		}
+	}
+
+	/**
+	 * Gitee batch-commit fallback: replay each change as its own commit. Used
+	 * only after a batch fails on a create conflict. Reuses the per-file
+	 * upload/remove logic, which already resolves create conflicts idempotently.
+	 */
+	private async batchCommitFallback(
+		files: BatchFileChange[],
+		deletes: BatchDelete[],
+		message: string
+	): Promise<void> {
+		for (const f of files) {
+			await this.upload(f.path, f.data, {
+				hash: await gitBlobSha1(f.data),
+				mtime: 0,
+				remoteHash: f.remoteHash,
+				message,
+			});
+		}
+		for (const d of deletes) {
+			await this.remove(d.path, d.remoteHash);
+		}
 	}
 
 	/**

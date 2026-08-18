@@ -286,18 +286,18 @@ export class SyncEngine {
 	): Promise<void> {
 		const l = messages();
 		const { message, staged } = opts;
-		const step = async (path: string, fn: () => Promise<void>) => {
-			try {
-				await fn();
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : String(e);
-				throw new Error(l.pathFailed(path, msg));
-			}
-		};
 
 		const isStaged = (path: string) => !staged || staged.has(path);
 		const stagedPushes = plan.pushes.filter((p) => isStaged(p.path));
 		const stagedDeletes = plan.remoteDeletes.filter((d) => isStaged(d.path));
+
+		// Failures that must NOT abort the whole batch — they are isolated per
+		// file and surfaced at the end so the caller can retry only those on the
+		// next sync. Without this, a single transient "file already exists"
+		// (Gitee create-conflict) or rate limit would abort hundreds of remaining
+		// uploads and force a manual re-trigger.
+		const pushFailures: string[] = [];
+		const deleteFailures: string[] = [];
 
 		// Phase 2: send local changes out.
 		if (this.plugin.settings.commitMode === "batch" && backend.batchCommit) {
@@ -330,9 +330,10 @@ export class SyncEngine {
 			}
 		} else {
 			// Per-file mode: sha-guarded, so a concurrent remote change surfaces
-			// as an API error instead of a silent overwrite.
+			// as an API error instead of a silent overwrite. A single file's
+			// failure is isolated — the remaining files still get transferred.
 			for (const { path, loc, rem } of stagedPushes) {
-				await step(path, async () => {
+				try {
 					const data = await this.vault.adapter.readBinary(loc.path);
 					await backend.upload(path, data, {
 						hash: loc.hash,
@@ -342,14 +343,28 @@ export class SyncEngine {
 					});
 					nextState[path] = loc.hash;
 					summary.pushed++;
-				});
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : String(e);
+					pushFailures.push(l.pathFailed(path, msg));
+				}
 			}
 			for (const { path, rem } of stagedDeletes) {
-				await step(path, async () => {
+				try {
 					await backend.remove(path, rem.hash);
 					summary.deletedRemote++;
-				});
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : String(e);
+					deleteFailures.push(l.pathFailed(path, msg));
+				}
 			}
+		}
+
+		// Persist whatever succeeded (nextState already reflects it), then
+		// surface any isolated failures so the caller records them and retries
+		// only those files on the next sync.
+		const failures = [...pushFailures, ...deleteFailures];
+		if (failures.length > 0) {
+			throw new Error(l.pushPartiallyFailed(summary.pushed, summary.deletedRemote, failures));
 		}
 	}
 
