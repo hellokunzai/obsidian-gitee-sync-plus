@@ -26,7 +26,7 @@ interface DiffState extends Record<string, unknown> {
 	kind: DiffKind;
 }
 
-interface DiffRow {
+export interface DiffRow {
 	oldLine: number;
 	newLine: number;
 	oldText: string;
@@ -950,7 +950,7 @@ class RevertConfirmModal extends Modal {
 	}
 }
 
-function splitLines(text: string): string[] {
+export function splitLines(text: string): string[] {
 	if (text === "") return [];
 	// Keep line endings out of the diff display.
 	return text.split(/\r?\n/);
@@ -965,7 +965,7 @@ function normalizeLineEndings(text: string): string {
  * Greedy line-based diff that aligns equal lines and emits paired change blocks.
  * Performs well on typical note-sized files while remaining dependency-free.
  */
-function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
+export function computeDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
 	const rows: DiffRow[] = [];
 	let i = 0;
 	let j = 0;

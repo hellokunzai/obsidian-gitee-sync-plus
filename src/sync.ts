@@ -14,10 +14,28 @@ export interface SyncSummary {
 	conflicts: number;
 }
 
-interface LocalEntry {
+export interface LocalEntry {
 	path: string;
 	hash: string;
 	mtime: number;
+}
+
+/** How a conflicting file should be resolved during a pull. */
+export type ConflictResolution =
+	| { action: "local" }
+	| { action: "remote" }
+	| { action: "merge"; content: string };
+
+/** A file that was modified on both sides since the last successful sync. */
+export interface ConflictEntry {
+	path: string;
+	/** Local version, if the file still exists locally. */
+	loc?: LocalEntry;
+	/** Remote version, if the file still exists remotely. */
+	rem?: RemoteEntry;
+	reason: string;
+	/** The mtime-based default winner, used when no manual resolution is given. */
+	preferred: "local" | "remote";
 }
 
 export interface SyncPlan {
@@ -26,10 +44,12 @@ export interface SyncPlan {
 	baseCount: number;
 	unchanged: number;
 	conflicts: number;
-	pulls: { path: string; rem: RemoteEntry; reason: string }[];
+	pulls: { path: string; rem: RemoteEntry; reason: string; isConflict?: boolean }[];
 	localDeletes: { path: string; loc: LocalEntry; reason: string }[];
-	pushes: { path: string; loc: LocalEntry; rem?: RemoteEntry; reason: string }[];
+	pushes: { path: string; loc: LocalEntry; rem?: RemoteEntry; reason: string; isConflict?: boolean }[];
 	remoteDeletes: { path: string; rem: RemoteEntry; reason: string }[];
+	/** Files changed on both sides since the last sync, surfaced for manual resolution. */
+	conflictEntries: ConflictEntry[];
 	/** Baseline entries for paths already identical on both sides. */
 	nextState: Record<string, string>;
 }
@@ -182,8 +202,13 @@ export class SyncEngine {
 		return this.buildPlan(createBackend(this.plugin.settings), opts);
 	}
 
-	/** Phase 1 only: download remote changes and apply remote deletions. */
-	async pullRemote(): Promise<SyncSummary> {
+	/** Phase 1 only: download remote changes and apply remote deletions.
+	 * When `conflictResolutions` is supplied (the pull-button flow), conflicting
+	 * files are resolved manually instead of by mtime, and the conflict-derived
+	 * auto-pull/push entries are skipped. */
+	async pullRemote(
+		conflictResolutions?: Map<string, ConflictResolution>
+	): Promise<SyncSummary> {
 		this.invalidateCaches();
 		const backend = createBackend(this.plugin.settings);
 		const plan = await this.buildPlan(backend);
@@ -196,7 +221,7 @@ export class SyncEngine {
 		};
 		const nextState = { ...plan.nextState };
 		try {
-			await this.executePull(backend, plan, nextState, summary);
+			await this.executePull(backend, plan, nextState, summary, conflictResolutions);
 		} catch (e) {
 			this.plugin.syncState = nextState;
 			await this.plugin.savePluginData();
@@ -283,9 +308,11 @@ export class SyncEngine {
 		backend: StorageBackend,
 		plan: SyncPlan,
 		nextState: Record<string, string>,
-		summary: SyncSummary
+		summary: SyncSummary,
+		conflictResolutions?: Map<string, ConflictResolution>
 	): Promise<void> {
 		const l = messages();
+		const conflictMode = !!conflictResolutions;
 		const step = async (path: string, fn: () => Promise<void>) => {
 			try {
 				await fn();
@@ -296,7 +323,11 @@ export class SyncEngine {
 		};
 		// Phase 1: bring remote changes in. An interrupted sync only ever
 		// leaves local work undone — the remote stays intact.
-		for (const { path, rem } of plan.pulls) {
+		// In conflict mode the conflict-derived auto-pulls are skipped and
+		// handled manually below, so they aren't overwritten silently.
+		for (const entry of plan.pulls) {
+			if (conflictMode && entry.isConflict) continue;
+			const { path, rem } = entry;
 			await step(path, async () => {
 				let { data, mtime } = await backend.download(path);
 				data = normalizeLineEndings(data);
@@ -318,6 +349,61 @@ export class SyncEngine {
 				delete this.plugin.hashCache[path];
 				summary.deletedLocal++;
 			});
+		}
+		// Manually resolve conflicts when resolutions were supplied.
+		if (conflictMode) {
+			for (const c of plan.conflictEntries) {
+				const res = conflictResolutions!.get(c.path);
+				const action: "local" | "remote" | "merge" = res
+					? res.action
+					: c.preferred === "local"
+						? "local"
+						: "remote";
+				await step(c.path, async () => {
+					if (action === "local") {
+						// Keep the local copy; record it as the new baseline.
+						if (c.loc) {
+							nextState[c.path] = c.loc.hash;
+						} else if (await this.vault.adapter.exists(c.path)) {
+							await this.vault.adapter.remove(c.path);
+							delete this.plugin.hashCache[c.path];
+							delete nextState[c.path];
+						}
+						return;
+					}
+					// 'remote' or 'merge' → write the resolved content.
+					let data: ArrayBuffer;
+					let sourceMtime: number;
+					if (action === "merge" && res && res.action === "merge") {
+						data = encodeText(res.content);
+						sourceMtime = c.loc?.mtime ?? 0;
+					} else if (c.rem) {
+						const dl = await backend.download(c.path);
+						data = normalizeLineEndings(dl.data);
+						sourceMtime = dl.mtime || c.rem.mtime || 0;
+					} else {
+						// Conflict resolved to "remote" but no remote copy (e.g.
+						// local was deleted and remote was modified): nothing to
+						// download — keep the local deletion.
+						if (c.loc && (await this.vault.adapter.exists(c.path))) {
+							await this.vault.adapter.remove(c.path);
+							delete this.plugin.hashCache[c.path];
+							delete nextState[c.path];
+						}
+						return;
+					}
+					const localMtime = await this.writeLocal(c.path, data, sourceMtime);
+					const finalHash = await backend.hashData(data);
+					nextState[c.path] = finalHash;
+					this.plugin.hashCache[c.path] = {
+						mtime: localMtime,
+						size: data.byteLength,
+						hash: finalHash,
+						algo: backend.id,
+					};
+					summary.pulled++;
+				});
+			}
 		}
 	}
 
@@ -441,6 +527,7 @@ export class SyncEngine {
 			localDeletes: [],
 			pushes: [],
 			remoteDeletes: [],
+			conflictEntries: [],
 			nextState: {},
 		};
 
@@ -505,44 +592,47 @@ export class SyncEngine {
 						reason: isNew ? l.reasonRemoteAdded : l.reasonRemoteModified,
 					});
 				else if (loc) plan.localDeletes.push({ path, loc, reason: l.reasonRemoteDeleted });
-			} else {
-				// Both sides changed since the last sync: newer mtime wins;
-				// a modification beats a deletion.
-				plan.conflicts++;
-				if (loc && rem) {
-					// Panel mode avoids expensive per-file commit-time lookups.
-					if (resolveConflictMtime) {
-						const remoteMtime = await this.remoteMtime(backend, path, rem);
-						if (loc.mtime >= remoteMtime) {
-							plan.pushes.push({
-								path,
-								loc,
-								rem,
-								reason: l.reasonConflictLocalNewer(ts(loc.mtime), ts(remoteMtime)),
-							});
-						} else {
-							plan.pulls.push({
-								path,
-								rem,
-								reason: l.reasonConflictRemoteNewer(ts(remoteMtime), ts(loc.mtime)),
-							});
-						}
+		} else {
+			// Both sides changed since the last sync: newer mtime wins;
+			// a modification beats a deletion. These are surfaced to the user
+			// as conflicts instead of being silently overwritten.
+			plan.conflicts++;
+			let preferred: "local" | "remote" = "remote";
+			let reason: string;
+			if (loc && rem) {
+				// Panel mode avoids expensive per-file commit-time lookups.
+				if (resolveConflictMtime) {
+					const remoteMtime = await this.remoteMtime(backend, path, rem);
+					if (loc.mtime >= remoteMtime) {
+						preferred = "local";
+						reason = l.reasonConflictLocalNewer(ts(loc.mtime), ts(remoteMtime));
+						plan.pushes.push({ path, loc, rem, reason, isConflict: true });
 					} else {
-						// In the panel we only need to know the file is conflicting;
-						// the exact winner is resolved when the sync is actually run.
-						plan.pushes.push({
-							path,
-							loc,
-							rem,
-							reason: l.reasonConflictBothChanged,
-						});
+						preferred = "remote";
+						reason = l.reasonConflictRemoteNewer(ts(remoteMtime), ts(loc.mtime));
+						plan.pulls.push({ path, rem, reason, isConflict: true });
 					}
-				} else if (loc) {
-					plan.pushes.push({ path, loc, rem, reason: l.reasonConflictKeepLocal });
-				} else if (rem) {
-					plan.pulls.push({ path, rem, reason: l.reasonConflictKeepRemote });
+				} else {
+					// In the panel we only need to know the file is conflicting;
+					// the exact winner is resolved when the user runs the pull.
+					preferred = "remote";
+					reason = l.reasonConflictBothChanged;
+					plan.pushes.push({ path, loc, rem, reason, isConflict: true });
 				}
+			} else if (loc) {
+				preferred = "local";
+				reason = l.reasonConflictKeepLocal;
+				plan.pushes.push({ path, loc, rem, reason, isConflict: true });
+			} else if (rem) {
+				preferred = "remote";
+				reason = l.reasonConflictKeepRemote;
+				plan.pulls.push({ path, rem, reason, isConflict: true });
+			} else {
+				// Unreachable: at least one side must exist to reach this branch.
+				continue;
 			}
+			plan.conflictEntries.push({ path, loc, rem, reason, preferred });
+		}
 		}
 		return plan;
 	}
@@ -747,4 +837,9 @@ function normalizeLineEndings(data: ArrayBuffer): ArrayBuffer {
 
 function ts(ms: number): string {
 	return ms > 0 ? formatDateTime(new Date(ms)) : messages().unknown;
+}
+
+/** Encodes text to an LF-normalized ArrayBuffer for writing via writeLocal. */
+function encodeText(text: string): ArrayBuffer {
+	return new TextEncoder().encode(text.replace(/\r\n/g, "\n")).buffer;
 }

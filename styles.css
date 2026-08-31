@@ -704,3 +704,443 @@
 	align-items: center;
 	gap: 8px;
 }
+
+/* ===== Conflict resolver modal ===== */
+.gitee-sync-plus-conflict-modal {
+	width: 560px !important;
+	max-width: 92vw !important;
+	display: flex;
+	flex-direction: column;
+	max-height: 80vh;
+}
+.gitee-sync-plus-conflict-intro {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	margin: 4px 0 12px;
+	line-height: 1.5;
+}
+.gitee-sync-plus-conflict-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	overflow-y: auto;
+	min-height: 0;
+	flex: 1 1 auto;
+	padding-right: 2px;
+}
+.gitee-sync-plus-conflict-item {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+}
+.gitee-sync-plus-conflict-item-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	min-width: 0;
+}
+.gitee-sync-plus-conflict-item-name {
+	font-weight: 600;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.gitee-sync-plus-conflict-item-path {
+	font-size: 0.72em;
+	color: var(--text-faint);
+	word-break: break-all;
+}
+.gitee-sync-plus-conflict-item-reason {
+	font-size: 0.78em;
+	color: var(--text-muted);
+	margin: 0;
+}
+.gitee-sync-plus-conflict-item-status {
+	font-size: 0.78em;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 4px;
+	align-self: flex-start;
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+.gitee-sync-plus-conflict-item-status.s-local {
+	background: rgba(var(--color-green-rgb), 0.16);
+	color: var(--text-success);
+}
+.gitee-sync-plus-conflict-item-status.s-remote {
+	background: rgba(var(--color-blue-rgb), 0.16);
+	color: var(--text-accent);
+}
+.gitee-sync-plus-conflict-item-status.s-merge {
+	background: rgba(var(--color-orange-rgb), 0.16);
+	color: var(--text-warning);
+}
+.gitee-sync-plus-conflict-item-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.gitee-sync-plus-conflict-btn {
+	flex: 1 1 auto;
+	min-width: 84px;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 0.85em;
+	transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.gitee-sync-plus-conflict-btn:hover {
+	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-conflict-btn.is-selected {
+	border-color: var(--text-accent);
+	background: var(--background-modifier-form-field-highlighted);
+	color: var(--text-accent);
+	font-weight: 600;
+}
+.gitee-sync-plus-conflict-btn-merge {
+	border-color: rgba(var(--color-orange-rgb), 0.5);
+}
+.gitee-sync-plus-conflict-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-conflict-footer-left,
+.gitee-sync-plus-conflict-footer-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.gitee-sync-plus-conflict-pending {
+	font-size: 0.8em;
+	color: var(--text-muted);
+}
+.gitee-sync-plus-conflict-btn.is-disabled,
+.gitee-sync-plus-conflict-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.gitee-sync-plus-conflict-btn:disabled:hover {
+	background: var(--background-primary);
+}
+
+/* ===== In-modal conflict diff viewer ===== */
+.gitee-sync-plus-conflict-diff-modal {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+.gitee-sync-plus-conflict-diff-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-conflict-diff-title {
+	font-weight: 600;
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.gitee-sync-plus-conflict-diff-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-conflict-diff-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 26px;
+	padding: 0 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	font-size: 0.8em;
+	cursor: pointer;
+	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.gitee-sync-plus-conflict-diff-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+.gitee-sync-plus-conflict-diff-btn.is-active {
+	background: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+	border-color: var(--text-accent);
+}
+.gitee-sync-plus-conflict-diff-body {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+.gitee-sync-plus-conflict-diff-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 8px 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-conflict-diff-footer-right {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.gitee-sync-plus-conflict-diff-stat {
+	font-size: 0.78em;
+	color: var(--text-muted);
+}
+/* Unified (single-column) diff layout */
+.gitee-sync-plus-diff-files-unified {
+	width: 100%;
+}
+.gitee-sync-plus-diff-section-unified {
+	width: 100%;
+}
+.gitee-sync-plus-diff-table-unified {
+	table-layout: fixed;
+}
+.gitee-sync-plus-diff-unified-sign {
+	width: 1.6em;
+	min-width: 1.6em;
+	max-width: 1.6em;
+	text-align: center;
+	color: var(--text-muted);
+	user-select: none;
+}
+
+/* Icon-only buttons in diff header */
+.gitee-sync-plus-conflict-diff-icon-btn {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	font-size: 14px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Per-row rollback button column & button */
+.gitee-sync-plus-diff-rb {
+	width: 32px;
+	min-width: 32px;
+	text-align: center;
+	vertical-align: middle;
+}
+.gitee-sync-plus-diff-rb-btn {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 50%;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	font-size: 11px;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.gitee-sync-plus-diff-rb-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	border-color: var(--text-accent);
+	transform: scale(1.15);
+}
+/* Row that has been rolled back — dim it to show the change is rejected */
+.gitee-sync-plus-diff-row.is-rolled-back {
+	opacity: 0.4;
+}
+.gitee-sync-plus-diff-row.is-rolled-back .gitee-sync-plus-diff-rb-btn {
+	background: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+	border-color: var(--text-accent);
+}
+
+/* ===== Merge editor modal ===== */
+.gitee-sync-plus-merge-modal {
+	width: 720px !important;
+	max-width: 94vw !important;
+	display: flex;
+	flex-direction: column;
+	max-height: 86vh;
+}
+.gitee-sync-plus-merge-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+.gitee-sync-plus-merge-title {
+	font-weight: 600;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.gitee-sync-plus-merge-back {
+	padding: 4px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-muted);
+	cursor: pointer;
+	flex: 0 0 auto;
+}
+.gitee-sync-plus-merge-back:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+.gitee-sync-plus-merge-hint {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	margin: 0 0 10px;
+	line-height: 1.5;
+}
+.gitee-sync-plus-merge-body {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	overflow-y: auto;
+	min-height: 0;
+	flex: 1 1 auto;
+}
+.gitee-sync-plus-merge-equal {
+	font-size: 0.72em;
+	color: var(--text-faint);
+	font-style: italic;
+	padding: 2px 4px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+.gitee-sync-plus-merge-chunk {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-secondary);
+}
+.gitee-sync-plus-merge-chunk-label {
+	font-size: 0.78em;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+.gitee-sync-plus-merge-chunk-sides {
+	display: flex;
+	gap: 8px;
+}
+.gitee-sync-plus-merge-side {
+	flex: 1 1 50%;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	border-radius: 4px;
+	overflow: hidden;
+}
+.gitee-sync-plus-merge-side-local {
+	border: 1px solid rgba(var(--color-green-rgb), 0.4);
+}
+.gitee-sync-plus-merge-side-remote {
+	border: 1px solid rgba(var(--color-blue-rgb), 0.4);
+}
+.gitee-sync-plus-merge-side-title {
+	font-size: 0.72em;
+	font-weight: 600;
+	padding: 3px 8px;
+	color: var(--text-normal);
+}
+.gitee-sync-plus-merge-side-local .gitee-sync-plus-merge-side-title {
+	background: rgba(var(--color-green-rgb), 0.14);
+	color: var(--text-success);
+}
+.gitee-sync-plus-merge-side-remote .gitee-sync-plus-merge-side-title {
+	background: rgba(var(--color-blue-rgb), 0.14);
+	color: var(--text-accent);
+}
+.gitee-sync-plus-merge-side-pre {
+	margin: 0;
+	padding: 6px 8px;
+	font-family: var(--font-monospace);
+	font-size: 0.78em;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-height: 180px;
+	overflow: auto;
+	background: var(--background-primary);
+	color: var(--text-normal);
+}
+.gitee-sync-plus-merge-chunk-btns {
+	display: flex;
+	gap: 6px;
+}
+.gitee-sync-plus-merge-choice {
+	flex: 1 1 auto;
+	padding: 5px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 0.8em;
+	transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.gitee-sync-plus-merge-choice:hover {
+	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-merge-choice.is-selected {
+	border-color: var(--text-accent);
+	background: var(--background-modifier-form-field-highlighted);
+	color: var(--text-accent);
+	font-weight: 600;
+}
+.gitee-sync-plus-merge-result-label {
+	font-size: 0.82em;
+	font-weight: 600;
+	color: var(--text-normal);
+	margin-top: 4px;
+}
+.gitee-sync-plus-merge-result {
+	width: 100%;
+	min-height: 140px;
+	resize: vertical;
+	font-family: var(--font-monospace);
+	font-size: 0.82em;
+	line-height: 1.5;
+	box-sizing: border-box;
+	padding: 8px;
+}
+.gitee-sync-plus-merge-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	flex: 0 0 auto;
+}

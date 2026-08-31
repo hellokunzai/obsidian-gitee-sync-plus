@@ -1,13 +1,14 @@
 import { App, ItemView, Modal, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { messages } from "./i18n";
-import { SyncEngine, SyncPlan } from "./sync";
+import { SyncEngine, SyncPlan, type ConflictResolution } from "./sync";
 import type { RemoteEntry } from "./backend";
 import { DiffKind, openDiffView } from "./DiffView";
+import { ConflictResolverModal } from "./ConflictResolver";
 
 export const GIT_PANEL_VIEW_TYPE = "gitee-sync-plus-git-panel";
 
-type ItemKind = "mod" | "add" | "del" | "remote";
+type ItemKind = "mod" | "add" | "del" | "remote" | "conflict";
 
 interface PanelItem {
 	path: string;
@@ -209,7 +210,7 @@ export class GitPanelView extends ItemView {
 	private changeCount(): number {
 		const p = this.plan;
 		if (!p) return 0;
-		return p.pulls.length + p.pushes.length + p.localDeletes.length + p.remoteDeletes.length;
+		return p.pulls.length + p.pushes.length + p.localDeletes.length + p.remoteDeletes.length + p.conflictEntries.length;
 	}
 
 	private renderList(): void {
@@ -267,6 +268,13 @@ export class GitPanelView extends ItemView {
 				path: x.path,
 				tag: l.statusTagDeleted,
 				kind: "del" as ItemKind,
+				discardable: false,
+				group: "remote" as const,
+			})),
+			...p.conflictEntries.map((x) => ({
+				path: x.path,
+				tag: l.statusTagConflict,
+				kind: "conflict" as ItemKind,
 				discardable: false,
 				group: "remote" as const,
 			})),
@@ -527,16 +535,49 @@ export class GitPanelView extends ItemView {
 		const l = messages();
 		this.setStatus(l.panelStatusWorking);
 		try {
-			const summary = await this.engine.pullRemote();
+			const plan = await this.engine.computePlan();
+			// Conflicts exist: surface them to the user instead of overwriting
+			// local edits by mtime. The modal collects resolutions and then runs
+			// the pull; cancelling resets the busy flag via endPullBusy().
+			if (plan.conflictEntries.length > 0) {
+				new ConflictResolverModal(
+					this.app,
+					this.plugin,
+					plan.conflictEntries,
+					(resolutions) => void this.runPullWithResolutions(resolutions),
+					() => void this.endPullBusy()
+				).open();
+				return;
+			}
+			await this.runPullWithResolutions(undefined);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			this.setStatus(l.panelStatusError(msg));
+			new Notice(l.syncFailed(msg), 8000);
+			void this.endPullBusy();
+		}
+	}
+
+	/** Runs the pull (with optional manual conflict resolutions) and refreshes. */
+	private async runPullWithResolutions(
+		resolutions: Map<string, ConflictResolution> | undefined
+	): Promise<void> {
+		const l = messages();
+		try {
+			const summary = await this.engine.pullRemote(resolutions);
 			this.plugin.announceSummary(summary);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			this.setStatus(l.panelStatusError(msg));
 			new Notice(l.syncFailed(msg), 8000);
 		} finally {
-			this.busy = false;
+			await this.endPullBusy();
 		}
-		// Refresh AFTER releasing the busy flag (same guard issue as onCommit).
+	}
+
+	/** Releases the busy lock and refreshes the panel (shared by both paths). */
+	private async endPullBusy(): Promise<void> {
+		this.busy = false;
 		await this.refresh();
 	}
 }
