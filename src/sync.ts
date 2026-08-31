@@ -58,6 +58,17 @@ export class SyncEngine {
 	/** Cache of the remote manifest to avoid repeated API calls during panel refreshes. */
 	private manifestCache: { entries: RemoteEntry[]; ts: number } | null = null;
 	private readonly MANIFEST_CACHE_TTL = 5000;
+	/**
+	 * Cache of LF-normalized remote hashes. The sync engine compares local files
+	 * by their LF-normalized hash, but the remote manifest stores raw git blob
+	 * SHAs. This cache lets us avoid downloading the same remote file repeatedly
+	 * just to check whether a hash mismatch is only a line-ending difference.
+	 */
+	private normalizedRemoteCache = new Map<
+		string,
+		{ rawHash: string; normalizedHash: string; ts: number }
+	>();
+	private readonly NORMALIZED_REMOTE_CACHE_TTL = 60000;
 
 	private async fetchManifest(backend: StorageBackend): Promise<RemoteEntry[]> {
 		if (this.manifestCache && Date.now() - this.manifestCache.ts < this.MANIFEST_CACHE_TTL) {
@@ -71,6 +82,37 @@ export class SyncEngine {
 	/** Drops cached remote state; call before mutating operations. */
 	invalidateCaches(): void {
 		this.manifestCache = null;
+		this.normalizedRemoteCache.clear();
+	}
+
+	/**
+	 * Returns the hash the remote file would have if its line endings were
+	 * normalized to LF. Local hashes are always computed over LF-normalized
+	 * content, so comparing with this value lets the sync plan ignore CRLF-vs-LF
+	 * differences that are not meaningful content changes.
+	 */
+	private async getNormalizedRemoteHash(
+		backend: StorageBackend,
+		path: string,
+		rem: RemoteEntry
+	): Promise<string> {
+		const cached = this.normalizedRemoteCache.get(path);
+		if (
+			cached &&
+			cached.rawHash === rem.hash &&
+			Date.now() - cached.ts < this.NORMALIZED_REMOTE_CACHE_TTL
+		) {
+			return cached.normalizedHash;
+		}
+		const { data } = await backend.download(path);
+		const normalized = normalizeLineEndings(data);
+		const normalizedHash = await backend.hashData(normalized);
+		this.normalizedRemoteCache.set(path, {
+			rawHash: rem.hash,
+			normalizedHash,
+			ts: Date.now(),
+		});
+		return normalizedHash;
 	}
 
 	/** Dry run: build and describe the plan without transferring anything. */
@@ -212,9 +254,10 @@ export class SyncEngine {
 		for (const p of plan.pushes) {
 			if (!wanted.has(p.path)) continue;
 			if (p.rem) {
-				const { data, hash, mtime } = await backend.download(p.path);
+				let { data, mtime } = await backend.download(p.path);
+				data = normalizeLineEndings(data);
 				const localMtime = await this.writeLocal(p.path, data, mtime || p.rem.mtime);
-				const finalHash = hash || p.rem.hash;
+				const finalHash = await backend.hashData(data);
 				nextState[p.path] = finalHash;
 				this.plugin.hashCache[p.path] = {
 					mtime: localMtime,
@@ -255,9 +298,10 @@ export class SyncEngine {
 		// leaves local work undone — the remote stays intact.
 		for (const { path, rem } of plan.pulls) {
 			await step(path, async () => {
-				const { data, hash, mtime } = await backend.download(path);
+				let { data, mtime } = await backend.download(path);
+				data = normalizeLineEndings(data);
 				const localMtime = await this.writeLocal(path, data, mtime || rem.mtime);
-				const finalHash = hash || rem.hash;
+				const finalHash = await backend.hashData(data);
 				nextState[path] = finalHash;
 				this.plugin.hashCache[path] = {
 					mtime: localMtime,
@@ -304,7 +348,8 @@ export class SyncEngine {
 			// Batch mode: all staged pushes and remote deletes in a single commit.
 			const batchFiles: BatchFileChange[] = [];
 			for (const { path, loc, rem } of stagedPushes) {
-				const data = await this.vault.adapter.readBinary(loc.path);
+				let data = await this.vault.adapter.readBinary(loc.path);
+				data = normalizeLineEndings(data);
 				batchFiles.push({ path, data, remoteHash: rem?.hash });
 			}
 			const batchDeletes: BatchDelete[] = stagedDeletes.map(({ path, rem }) => ({
@@ -334,7 +379,8 @@ export class SyncEngine {
 			// failure is isolated — the remaining files still get transferred.
 			for (const { path, loc, rem } of stagedPushes) {
 				try {
-					const data = await this.vault.adapter.readBinary(loc.path);
+					let data = await this.vault.adapter.readBinary(loc.path);
+					data = normalizeLineEndings(data);
 					await backend.upload(path, data, {
 						hash: loc.hash,
 						mtime: loc.mtime,
@@ -411,6 +457,30 @@ export class SyncEngine {
 				plan.unchanged++;
 				continue;
 			}
+
+			// Local hashes are computed over LF-normalized content, while the
+			// remote manifest stores raw git blob SHAs. A file whose only
+			// difference is CRLF vs LF is textually identical and should not be
+			// listed as a change in the panel or preview.
+			if (loc && rem && loc.hash !== rem.hash) {
+				try {
+					const normalizedRemoteHash = await this.getNormalizedRemoteHash(backend, path, rem);
+					if (loc.hash === normalizedRemoteHash) {
+						plan.nextState[path] = loc.hash;
+						plan.unchanged++;
+						continue;
+					}
+				} catch (e) {
+					// If the normalized hash cannot be fetched (e.g. transient
+					// network error), fall through to the regular change logic
+					// rather than hiding a potentially real change.
+					console.error(
+						`[gitee-sync-plus] failed to compute normalized remote hash for ${path}`,
+						e
+					);
+				}
+			}
+
 			// Deleted on both sides (or never existed anymore).
 			if (!loc && !rem) continue;
 

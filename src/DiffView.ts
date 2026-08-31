@@ -443,7 +443,8 @@ export class DiffView extends ItemView {
 			text: l.diffMarkSynced,
 			cls: "mod-cta",
 		});
-		syncBtn.addEventListener("click", () => void this.markAsSynced(path, remoteHash));
+		const localText = this.localSide === "before" ? beforeText : afterText;
+		syncBtn.addEventListener("click", () => void this.markAsSynced(path, localText));
 
 		const showBtn = actions.createEl("button", {
 			text: l.diffShowAnyway,
@@ -454,10 +455,13 @@ export class DiffView extends ItemView {
 		);
 	}
 
-	private async markAsSynced(path: string, remoteHash: string): Promise<void> {
+	private async markAsSynced(path: string, localText: string): Promise<void> {
 		const l = messages();
 		try {
-			this.plugin.syncState[path] = remoteHash;
+			const backend = createBackend(this.plugin.settings);
+			const normalized = new TextEncoder().encode(normalizeLineEndings(localText)).buffer;
+			const localHash = await backend.hashData(normalized);
+			this.plugin.syncState[path] = localHash;
 			await this.plugin.savePluginData();
 			new Notice(l.diffMarkedAsSynced(path));
 		} catch (e) {
