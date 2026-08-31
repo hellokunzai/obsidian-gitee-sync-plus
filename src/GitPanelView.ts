@@ -1,4 +1,4 @@
-import { App, ItemView, Modal, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import { App, ItemView, Modal, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import type CloudSyncPlugin from "./main";
 import { messages } from "./i18n";
 import { SyncEngine, SyncPlan } from "./sync";
@@ -15,6 +15,13 @@ interface PanelItem {
 	kind: ItemKind;
 	discardable: boolean;
 	group: "local" | "remote";
+}
+
+/** Extract the file name from a vault-relative path for compact display. */
+function fileBasename(path: string): string {
+	const normalized = path.replace(/\\/g, "/");
+	const parts = normalized.split("/");
+	return parts[parts.length - 1] || path;
 }
 
 /** Destructive-action confirm modal (discard local changes). */
@@ -356,7 +363,11 @@ export class GitPanelView extends ItemView {
 				text: item.tag,
 				cls: `gitee-sync-plus-panel-item-status s-${item.kind}`,
 			});
-			row.createSpan({ text: item.path, cls: "gitee-sync-plus-panel-item-path" });
+			const pathEl = row.createSpan({
+				text: fileBasename(item.path),
+				cls: "gitee-sync-plus-panel-item-path",
+			});
+			setTooltip(pathEl, item.path, { placement: "top" });
 
 			const viewBtn = row.createEl("button", {
 				cls: "clickable-icon gitee-sync-plus-panel-icon-btn gitee-sync-plus-panel-item-action",
