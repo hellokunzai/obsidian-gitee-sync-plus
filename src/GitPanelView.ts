@@ -124,15 +124,16 @@ export class GitPanelView extends ItemView {
 			}
 		});
 
-		// Action buttons
-		const btnRow = container.createDiv("gitee-sync-plus-panel-buttons");
-		btnRow
+		// Action buttons — commit gets its own full-width row, pull/refresh share a row.
+		const btnWrapper = container.createDiv("gitee-sync-plus-panel-buttons");
+		btnWrapper
 			.createEl("button", { text: l.panelCommit, cls: "mod-cta gitee-sync-plus-panel-btn" })
 			.addEventListener("click", () => void this.onCommit());
-		btnRow
+		const secondaryRow = btnWrapper.createDiv("gitee-sync-plus-panel-button-row");
+		secondaryRow
 			.createEl("button", { text: l.panelPull, cls: "gitee-sync-plus-panel-btn" })
 			.addEventListener("click", () => void this.onPull());
-		btnRow
+		secondaryRow
 			.createEl("button", { text: l.panelRefresh, cls: "gitee-sync-plus-panel-btn" })
 			.addEventListener("click", () => void this.refresh(true));
 

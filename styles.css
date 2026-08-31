@@ -70,9 +70,19 @@
 }
 .gitee-sync-plus-panel-buttons {
 	display: flex;
+	flex-direction: column;
 	gap: 6px;
 }
-.gitee-sync-plus-panel-btn {
+/* The single commit button is a direct child of the column container — fill the row. */
+.gitee-sync-plus-panel-buttons > .gitee-sync-plus-panel-btn {
+	width: 100%;
+}
+/* Pull + refresh share a row and split it evenly. */
+.gitee-sync-plus-panel-button-row {
+	display: flex;
+	gap: 6px;
+}
+.gitee-sync-plus-panel-button-row .gitee-sync-plus-panel-btn {
 	flex: 1;
 }
 .gitee-sync-plus-panel-list {

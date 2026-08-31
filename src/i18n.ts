@@ -261,9 +261,9 @@ const zh: typeof en = {
 	commitUpdate: (path) => `同步：更新 ${path}`,
 	commitDelete: (path) => `同步：删除 ${path}`,
 	commitBatch: (uploaded, deleted) =>
-		`同步：批量提交 — ${uploaded} 更新${deleted ? `，${deleted} 删除` : ""}`,
+		`同步：批量推送 — ${uploaded} 更新${deleted ? `，${deleted} 删除` : ""}`,
 	batchCommitFailed: (uploaded, deleted, message) =>
-		`批量提交失败（${uploaded} 个文件待更新，${deleted} 个待删除）：${message}`,
+		`批量推送失败（${uploaded} 个文件待更新，${deleted} 个待删除）：${message}`,
 
 	settingsBackend: "存储后端",
 	settingsBackendDesc: "切换后端后，首次同步会对两边差异做一次全量对账，并保留修改时间较新的版本。",
@@ -370,9 +370,9 @@ const zh: typeof en = {
 	panelTitle: "Git 面板",
 	panelRibbon: "打开 Gitee Sync Plus Git 面板",
 	panelOpenCommand: "打开 Git 面板",
-	panelMessagePlaceholder: "提交说明（批量模式下生效）…",
-	panelCommitHint: "每文件模式下每个文件保留各自说明；上方文本仅对批量提交生效。",
-	panelCommit: "提交",
+	panelMessagePlaceholder: "推送说明（批量模式下生效）…",
+	panelCommitHint: "每文件模式下每个文件保留各自说明；上方文本仅对批量推送生效。",
+	panelCommit: "推送",
 	panelPull: "拉取",
 	panelRefresh: "刷新",
 	panelGroupLocal: "本地更改",
@@ -402,7 +402,7 @@ const zh: typeof en = {
 	panelUnstageAll: "全部取消暂存",
 	panelStageAllHint: "暂存所有本地更改",
 	panelUnstageAllHint: "取消暂存所有更改",
-	panelNothingStaged: "没有已暂存的更改可提交",
+	panelNothingStaged: "没有已暂存的更改可推送",
 	panelViewDiff: "查看差异",
 	panelCollapseGroup: "折叠",
 	panelExpandGroup: "展开",
