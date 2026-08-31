@@ -851,7 +851,7 @@ export class ConflictDiffModal extends Modal {
 
 		/* Inline rollback button on LOCAL side only (matches ConflictDiffModal convention:
 		   user rolls back to reject a remote change and keep their local line). */
-		if (row.state !== "equal" && row.oldLine > 0) {
+		if (row.state !== "equal") {
 			const rbBtn = localNum.createEl("button", {
 				cls: "gitee-sync-plus-diff-revert-btn",
 				title: l.diffRollback,
@@ -890,12 +890,12 @@ export class ConflictDiffModal extends Modal {
 		rightCell.textContent = row.newText;
 		tr.append(leftNum, leftCell, rightNum, rightCell);
 
-		// Inline rollback button on the LOCAL side (left num cell). Matches
+		// Inline rollback button on the LOCAL side (right num cell). Matches
 		// the tab view (DiffView.ts) where the revert button is appended into
 		// the num cell rather than living in its own column, so the diff
 		// layout stays a clean 4-column side-by-side.
-		if (row.state !== "equal" && row.oldLine > 0) {
-			const rbBtn = leftNum.createEl("button", {
+		if (row.state !== "equal") {
+			const rbBtn = rightNum.createEl("button", {
 				cls: "gitee-sync-plus-diff-revert-btn",
 				title: l.diffRollback,
 			});
