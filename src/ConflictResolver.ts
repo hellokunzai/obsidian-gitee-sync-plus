@@ -583,14 +583,15 @@ export class ConflictDiffModal extends Modal {
 	private updateLayoutButton(): void {
 		this.layoutBtn.innerHTML =
 			this.layout === "side-by-side"
-				? "&#x21C5;" /* ⇅ */
-				: "&#x2630;" /* ☰ */;
+				? "\u21C5" /* ⇅ */
+				: "\u21C4" /* ⇄ */;
 	}
 
 	private updateCollapseButton(): void {
+		// Match the tab view (DiffView.ts): use ≣ / ≡ instead of ▼ / ▶.
 		this.collapseBtn.innerHTML = this.collapseUnchanged
-			? "&#x25BC;" /* ▼ */
-			: "&#x25B6;" /* ▶ */;
+			? "\u2263" /* ≣ */
+			: "\u2261" /* ≡ */;
 		this.collapseBtn.toggleClass("is-active", this.collapseUnchanged);
 	}
 
@@ -707,10 +708,9 @@ export class ConflictDiffModal extends Modal {
 			const ph = tbody.createEl("tr", {
 				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
 			});
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-rb" });
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
 			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
 			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
 			const frag = document.createDocumentFragment();
 			for (let i = seg.start + ctx; i <= seg.end - ctx; i++) {
@@ -725,28 +725,12 @@ export class ConflictDiffModal extends Modal {
 	}
 
 	private buildSideRow(row: DiffRow, collapsible: boolean, rowIndex: number): HTMLTableRowElement {
+		const l = messages();
 		const tr = document.createElement("tr");
 		tr.className =
 			(collapsible ? "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible " : "gitee-sync-plus-diff-row ") +
 			`state-${row.state}`;
 		if (this.rolledBack.has(rowIndex)) tr.addClass("is-rolled-back");
-
-		// Rollback button column
-		const rbCell = document.createElement("td");
-		rbCell.className = "gitee-sync-plus-diff-rb";
-		if (row.state !== "equal") {
-			const rbBtn = rbCell.createEl("button", {
-				cls: "gitee-sync-plus-diff-rb-btn",
-				title: messages().diffRollback,
-			});
-			rbBtn.innerHTML = "&#x21A6;" /* ↦ */;
-			rbBtn.addEventListener("click", () => {
-				if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
-				else this.rolledBack.add(rowIndex);
-				this.render();
-			});
-		}
-		tr.appendChild(rbCell);
 
 		const leftNum = document.createElement("td");
 		leftNum.className = "gitee-sync-plus-diff-num";
@@ -761,6 +745,25 @@ export class ConflictDiffModal extends Modal {
 		rightCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		rightCell.textContent = row.newText;
 		tr.append(leftNum, leftCell, rightNum, rightCell);
+
+		// Inline rollback button on the LOCAL side (left num cell). Matches
+		// the tab view (DiffView.ts) where the revert button is appended into
+		// the num cell rather than living in its own column, so the diff
+		// layout stays a clean 4-column side-by-side.
+		if (row.state !== "equal" && row.oldLine > 0) {
+			const rbBtn = leftNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-rb-btn",
+				title: l.diffRollback,
+			});
+			rbBtn.textContent = "\u21A9"; /* ↩ */
+			rbBtn.addEventListener("click", (evt) => {
+				evt.stopPropagation();
+				if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
+				else this.rolledBack.add(rowIndex);
+				this.render();
+			});
+		}
+
 		return tr;
 	}
 
@@ -797,8 +800,7 @@ export class ConflictDiffModal extends Modal {
 			const ph = tbody.createEl("tr", {
 				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
 			});
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-rb" });
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
+			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
 			ph.createEl("td", { cls: "gitee-sync-plus-diff-unified-sign" });
 			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
 			const frag = document.createDocumentFragment();
@@ -814,32 +816,32 @@ export class ConflictDiffModal extends Modal {
 	}
 
 	private buildUnifiedRows(row: DiffRow, collapsible: boolean, rowIndex: number): HTMLTableRowElement[] {
+		const l = messages();
 		const cls = collapsible ? " gitee-sync-plus-diff-collapsible" : "";
 		const mk = (num: number, sign: string, text: string, state: string): HTMLTableRowElement => {
 			const tr = document.createElement("tr");
 			tr.className = `gitee-sync-plus-diff-row${cls} state-${state}`;
 			if (this.rolledBack.has(rowIndex)) tr.addClass("is-rolled-back");
 
-			// Rollback button column
-			const rbCell = document.createElement("td");
-			rbCell.className = "gitee-sync-plus-diff-rb";
-			if (state !== "equal") {
-				const rbBtn = rbCell.createEl("button", {
+			const numTd = document.createElement("td");
+			numTd.className = "gitee-sync-plus-diff-num";
+			numTd.textContent = num > 0 ? String(num) : "";
+			// Inline rollback button (only on diff rows). Mirrors the tab
+			// view's revert pattern: absolute-positioned inside the num cell,
+			// no extra column. `` ↩ `` matches the tab view icon.
+			if (state !== "equal" && num > 0) {
+				const rbBtn = numTd.createEl("button", {
 					cls: "gitee-sync-plus-diff-rb-btn",
-					title: messages().diffRollback,
+					title: l.diffRollback,
 				});
-				rbBtn.innerHTML = "&#x21A6;" /* ↦ */;
-				rbBtn.addEventListener("click", () => {
+				rbBtn.textContent = "\u21A9"; /* ↩ */
+				rbBtn.addEventListener("click", (evt) => {
+					evt.stopPropagation();
 					if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
 					else this.rolledBack.add(rowIndex);
 					this.render();
 				});
 			}
-			tr.appendChild(rbCell);
-
-			const numTd = document.createElement("td");
-			numTd.className = "gitee-sync-plus-diff-num";
-			numTd.textContent = num > 0 ? String(num) : "";
 			const signTd = document.createElement("td");
 			signTd.className = "gitee-sync-plus-diff-unified-sign";
 			signTd.textContent = sign;
