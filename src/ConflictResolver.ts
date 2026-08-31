@@ -486,7 +486,7 @@ class MergeEditorModal extends Modal {
 /**
  * In-modal diff viewer for a conflicting file. Opens on top of the conflict
  * resolver so the user can compare local vs remote without the side-effect of
- * opening a (blocked) workspace tab. Supports side-by-side / unified layouts,
+ * opening a (blocked) workspace tab. Supports side-by-side / vertical layouts,
  * collapse of unchanged runs, and one-click "keep local" / "use remote" which
  * resolve that conflict and return to the resolver.
  */
@@ -495,7 +495,7 @@ export class ConflictDiffModal extends Modal {
 	private statEl!: HTMLElement;
 	private layoutBtn!: HTMLButtonElement;
 	private collapseBtn!: HTMLButtonElement;
-	private layout: "side-by-side" | "unified" = "side-by-side";
+	private layout: "side-by-side" | "vertical" = "side-by-side";
 	private collapseUnchanged = true;
 	private rows: DiffRow[] = [];
 	private rolledBack = new Set<number>();
@@ -538,7 +538,7 @@ export class ConflictDiffModal extends Modal {
 			title: l.diffLayoutToggle,
 		});
 		this.layoutBtn.addEventListener("click", () => {
-			this.layout = this.layout === "side-by-side" ? "unified" : "side-by-side";
+			this.layout = this.layout === "side-by-side" ? "vertical" : "side-by-side";
 			this.updateLayoutButton();
 			this.render();
 		});
@@ -640,7 +640,7 @@ export class ConflictDiffModal extends Modal {
 		this.bodyEl.toggleClass("collapse-unchanged", this.collapseUnchanged);
 
 		if (this.layout === "side-by-side") this.renderSideBySide();
-		else this.renderUnified();
+		else this.renderVertical();
 
 		this.renderStat();
 	}
@@ -685,8 +685,8 @@ export class ConflictDiffModal extends Modal {
 			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-wide"
 		);
 		const header = section.createDiv("gitee-sync-plus-diff-section-labels");
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: l.diffLeftLocal });
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffRightRemote });
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: l.diffRightRemote });
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffLeftLocal });
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
 		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
 
@@ -724,6 +724,150 @@ export class ConflictDiffModal extends Modal {
 		}
 	}
 
+	private renderVertical(): void {
+		const l = messages();
+		const ctx = this.contextLines;
+		const wrapper = this.bodyEl.createDiv(
+			"gitee-sync-plus-diff-files gitee-sync-plus-diff-files-vertical"
+		);
+
+		/* Remote version panel (top) */
+		const remoteSection = wrapper.createDiv(
+			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-remote"
+		);
+		remoteSection.createDiv("gitee-sync-plus-diff-section-label").setText(l.diffRightRemote);
+		const remoteScroll = remoteSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const remoteTable = remoteScroll.createEl("table", {
+			cls: "gitee-sync-plus-diff-section-table",
+		});
+
+		/* Local version panel (bottom) */
+		const localSection = wrapper.createDiv(
+			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-local"
+		);
+		localSection.createDiv("gitee-sync-plus-diff-section-label").setText(l.diffLeftLocal);
+		const localScroll = localSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const localTable = localScroll.createEl("table", {
+			cls: "gitee-sync-plus-diff-section-table",
+		});
+
+		for (const seg of this.buildSegments()) {
+			const len = seg.end - seg.start + 1;
+			if (seg.type === "diff" || len <= ctx * 2 || !this.collapseUnchanged) {
+				const remoteBody = remoteTable.createEl("tbody");
+				const localBody = localTable.createEl("tbody");
+				for (let i = seg.start; i <= seg.end; i++) {
+					this.appendVerticalRows(remoteBody, localBody, this.rows[i], false, i);
+				}
+				continue;
+			}
+			/* Long equal run: collapse the middle */
+			const remoteBody = remoteTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+			const localBody = localTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+			for (let i = seg.start; i < seg.start + ctx; i++) {
+				this.appendVerticalRows(remoteBody, localBody, this.rows[i], false, i);
+			}
+			const hidden = len - ctx * 2;
+			const remotePh = remoteBody.createEl("tr", {
+				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+			});
+			remotePh.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
+			remotePh.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+			const localPh = localBody.createEl("tr", {
+				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+			});
+			localPh.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
+			localPh.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
+
+			const frag = document.createDocumentFragment();
+			const fragRemote = document.createDocumentFragment();
+			const fragLocal = document.createDocumentFragment();
+			for (let i = seg.start + ctx; i <= seg.end - ctx; i++) {
+				const { remoteEl, localEl } = this.buildVerticalPair(this.rows[i], true, i);
+				fragRemote.appendChild(remoteEl);
+				fragLocal.appendChild(localEl);
+			}
+			remotePh.after(fragRemote);
+			localPh.after(fragLocal);
+
+			const expand = () => {
+				remoteBody.toggleClass("is-expanded", true);
+				localBody.toggleClass("is-expanded", true);
+			};
+			remotePh.addEventListener("click", expand);
+			localPh.addEventListener("click", expand);
+
+			for (let i = seg.end - ctx + 1; i <= seg.end; i++) {
+				this.appendVerticalRows(remoteBody, localBody, this.rows[i], false, i);
+			}
+		}
+	}
+
+	private appendVerticalRows(
+		remoteBody: HTMLElement,
+		localBody: HTMLElement,
+		row: DiffRow,
+		collapsible: boolean,
+		rowIndex: number
+	): void {
+		const { remoteEl, localEl } = this.buildVerticalPair(row, collapsible, rowIndex);
+		remoteBody.appendChild(remoteEl);
+		localBody.appendChild(localEl);
+	}
+
+	private buildVerticalPair(
+		row: DiffRow,
+		collapsible: boolean,
+		rowIndex: number
+	): { remoteEl: HTMLTableRowElement; localEl: HTMLTableRowElement } {
+		const l = messages();
+		const cls = collapsible ? " gitee-sync-plus-diff-collapsible" : "";
+
+		/* Remote row (newText / right side) */
+		const remoteTr = document.createElement("tr");
+		remoteTr.className =
+			`gitee-sync-plus-diff-row${cls} ${row.newLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
+		if (this.rolledBack.has(rowIndex)) remoteTr.addClass("is-rolled-back");
+		const remoteNum = document.createElement("td");
+		remoteNum.className = "gitee-sync-plus-diff-num";
+		remoteNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
+		const remoteCell = document.createElement("td");
+		remoteCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
+		remoteCell.textContent = row.newText;
+		remoteTr.append(remoteNum, remoteCell);
+
+		/* Local row (oldText / left side) */
+		const localTr = document.createElement("tr");
+		localTr.className =
+			`gitee-sync-plus-diff-row${cls} ${row.oldLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
+		if (this.rolledBack.has(rowIndex)) localTr.addClass("is-rolled-back");
+		const localNum = document.createElement("td");
+		localNum.className = "gitee-sync-plus-diff-num";
+		localNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
+		const localCell = document.createElement("td");
+		localCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
+		localCell.textContent = row.oldText;
+		localTr.append(localNum, localCell);
+
+		/* Inline rollback button on LOCAL side only (matches ConflictDiffModal convention:
+		   user rolls back to reject a remote change and keep their local line). */
+		if (row.state !== "equal" && row.oldLine > 0) {
+			const rbBtn = localNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-revert-btn",
+				title: l.diffRollback,
+			});
+			rbBtn.textContent = "\u21A9"; /* ↩ */
+			rbBtn.addEventListener("click", (evt) => {
+				evt.stopPropagation();
+				if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
+				else this.rolledBack.add(rowIndex);
+				this.render();
+			});
+		}
+
+		return { remoteEl: remoteTr, localEl: localTr };
+	}
+
 	private buildSideRow(row: DiffRow, collapsible: boolean, rowIndex: number): HTMLTableRowElement {
 		const l = messages();
 		const tr = document.createElement("tr");
@@ -752,7 +896,7 @@ export class ConflictDiffModal extends Modal {
 		// layout stays a clean 4-column side-by-side.
 		if (row.state !== "equal" && row.oldLine > 0) {
 			const rbBtn = leftNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-rb-btn",
+				cls: "gitee-sync-plus-diff-revert-btn",
 				title: l.diffRollback,
 			});
 			rbBtn.textContent = "\u21A9"; /* ↩ */
@@ -765,100 +909,6 @@ export class ConflictDiffModal extends Modal {
 		}
 
 		return tr;
-	}
-
-	private renderUnified(): void {
-		const l = messages();
-		const ctx = this.contextLines;
-		const wrapper = this.bodyEl.createDiv(
-			"gitee-sync-plus-diff-files gitee-sync-plus-diff-files-unified"
-		);
-		const section = wrapper.createDiv(
-			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-unified"
-		);
-		const label = section.createDiv("gitee-sync-plus-diff-section-label");
-		label.setText(`${l.diffLeftLocal} → ${l.diffRightRemote}`);
-		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
-		const table = scrollBox.createEl("table", {
-			cls: "gitee-sync-plus-diff-table gitee-sync-plus-diff-table-unified",
-		});
-
-		for (const seg of this.buildSegments()) {
-			const len = seg.end - seg.start + 1;
-			if (seg.type === "diff" || len <= ctx * 2 || !this.collapseUnchanged) {
-				const tbody = table.createEl("tbody");
-				for (let i = seg.start; i <= seg.end; i++) {
-					for (const el of this.buildUnifiedRows(this.rows[i], false, i)) tbody.appendChild(el);
-				}
-				continue;
-			}
-			const tbody = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
-			for (let i = seg.start; i < seg.start + ctx; i++) {
-				for (const el of this.buildUnifiedRows(this.rows[i], false, i)) tbody.appendChild(el);
-			}
-			const hidden = len - ctx * 2;
-			const ph = tbody.createEl("tr", {
-				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
-			});
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-unified-sign" });
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
-			const frag = document.createDocumentFragment();
-			for (let i = seg.start + ctx; i <= seg.end - ctx; i++) {
-				for (const el of this.buildUnifiedRows(this.rows[i], true, i)) frag.appendChild(el);
-			}
-			ph.after(frag);
-			ph.addEventListener("click", () => tbody.toggleClass("is-expanded", true));
-			for (let i = seg.end - ctx + 1; i <= seg.end; i++) {
-				for (const el of this.buildUnifiedRows(this.rows[i], false, i)) tbody.appendChild(el);
-			}
-		}
-	}
-
-	private buildUnifiedRows(row: DiffRow, collapsible: boolean, rowIndex: number): HTMLTableRowElement[] {
-		const l = messages();
-		const cls = collapsible ? " gitee-sync-plus-diff-collapsible" : "";
-		const mk = (num: number, sign: string, text: string, state: string): HTMLTableRowElement => {
-			const tr = document.createElement("tr");
-			tr.className = `gitee-sync-plus-diff-row${cls} state-${state}`;
-			if (this.rolledBack.has(rowIndex)) tr.addClass("is-rolled-back");
-
-			const numTd = document.createElement("td");
-			numTd.className = "gitee-sync-plus-diff-num";
-			numTd.textContent = num > 0 ? String(num) : "";
-			// Inline rollback button (only on diff rows). Mirrors the tab
-			// view's revert pattern: absolute-positioned inside the num cell,
-			// no extra column. `` ↩ `` matches the tab view icon.
-			if (state !== "equal" && num > 0) {
-				const rbBtn = numTd.createEl("button", {
-					cls: "gitee-sync-plus-diff-rb-btn",
-					title: l.diffRollback,
-				});
-				rbBtn.textContent = "\u21A9"; /* ↩ */
-				rbBtn.addEventListener("click", (evt) => {
-					evt.stopPropagation();
-					if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
-					else this.rolledBack.add(rowIndex);
-					this.render();
-				});
-			}
-			const signTd = document.createElement("td");
-			signTd.className = "gitee-sync-plus-diff-unified-sign";
-			signTd.textContent = sign;
-			const cell = document.createElement("td");
-			cell.className = "gitee-sync-plus-diff-cell";
-			cell.textContent = text;
-			tr.append(numTd, signTd, cell);
-			return tr;
-		};
-		if (row.state === "equal") return [mk(row.oldLine, " ", row.oldText, "equal")];
-		if (row.state === "delete") return [mk(row.oldLine, "-", row.oldText, "delete")];
-		if (row.state === "insert") return [mk(row.newLine, "+", row.newText, "insert")];
-		// change: removed locally, added remotely
-		return [
-			mk(row.oldLine, "-", row.oldText, "delete"),
-			mk(row.newLine, "+", row.newText, "insert"),
-		];
 	}
 
 	onClose(): void {

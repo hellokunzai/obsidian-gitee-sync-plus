@@ -371,7 +371,7 @@
 	max-width: 36px;
 }
 .gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell {
-	width: 50%;
+    width: 50%;
 }
 .gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell.gitee-sync-plus-diff-empty {
 	background: repeating-linear-gradient(
@@ -911,23 +911,21 @@
 	font-size: 0.78em;
 	color: var(--text-muted);
 }
-/* Unified (single-column) diff layout */
-.gitee-sync-plus-diff-files-unified {
-	width: 100%;
+/* Vertical (top/bottom) diff layout */
+.gitee-sync-plus-diff-files-vertical {
+	flex-direction: column !important;
 }
-.gitee-sync-plus-diff-section-unified {
-	width: 100%;
+.gitee-sync-plus-diff-section-remote,
+.gitee-sync-plus-diff-section-local {
+	flex: 1 1 auto;
+	max-height: 50%;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	background: var(--background-primary);
 }
-.gitee-sync-plus-diff-table-unified {
-	table-layout: fixed;
-}
-.gitee-sync-plus-diff-unified-sign {
-	width: 1.6em;
-	min-width: 1.6em;
-	max-width: 1.6em;
-	text-align: center;
-	color: var(--text-muted);
-	user-select: none;
+.gitee-sync-plus-diff-section-remote + .gitee-sync-plus-diff-section-local {
+	border-top: 1px solid var(--background-modifier-border);
 }
 
 /* Icon-only buttons in diff header */
@@ -941,41 +939,30 @@
 	justify-content: center;
 }
 
-/* Per-row rollback button (inline within the line-number cell).
-   Positioned absolutely so it overlays the line number without adding a new
-   column. Matches the tab view's revert-btn approach so side-by-side and
-   unified layouts stay aligned. */
-.gitee-sync-plus-diff-rb-btn {
-    position: absolute;
-    right: 2px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 22px;
-    height: 20px;
-    padding: 0;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-primary);
-    color: var(--text-muted);
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-    pointer-events: auto;
+/* ConflictResolver (conflict diff modal): widen the num column so the
+   absolute-positioned revert button — which is now shared with the tab
+   view (.gitee-sync-plus-diff-revert-btn) — has room and doesn't cover
+   the line number text. Matches the tab view visually. */
+/* Inline rollback button column width: each num cell must leave room
+   for the absolute-positioned revert button (.gitee-sync-plus-diff-revert-btn)
+   so the line number text isn't covered.
+
+   - Side-by-side (two-column): two num columns live next to two equal-width
+     cell columns under `table-layout: fixed`. If both num columns were 72px
+     each (= 144px combined), cell columns would be squeezed out of the
+     visible area. 60px per side keeps the four-column layout balanced. */
+.gitee-sync-plus-diff-section-wide .gitee-sync-plus-diff-num {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    padding-right: 30px;
+    box-sizing: border-box;
 }
-.gitee-sync-plus-diff-rb-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-    border-color: var(--text-accent);
-}
-/* Row that has been rolled back — dim it to show the change is rejected */
+/* Row rolled back via the revert button — dim it to show the change is rejected */
 .gitee-sync-plus-diff-row.is-rolled-back {
     opacity: 0.4;
 }
-.gitee-sync-plus-diff-row.is-rolled-back .gitee-sync-plus-diff-rb-btn {
+.gitee-sync-plus-diff-row.is-rolled-back .gitee-sync-plus-diff-revert-btn {
     background: var(--background-modifier-active-hover);
     color: var(--text-accent);
     border-color: var(--text-accent);
