@@ -104,7 +104,7 @@
 .gitee-sync-plus-panel-group-header-left {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 4px;
 	min-width: 0;
 }
 .gitee-sync-plus-panel-group-title {
@@ -113,13 +113,13 @@
 	color: var(--text-muted);
 }
 .gitee-sync-plus-panel-collapse-btn {
-	width: 18px;
-	height: 18px;
-	color: var(--text-faint);
+	width: 20px;
+	height: 20px;
+	color: var(--icon-color, var(--text-faint));
 }
 .gitee-sync-plus-panel-collapse-btn svg {
-	width: 14px;
-	height: 14px;
+	width: 16px;
+	height: 16px;
 }
 .gitee-sync-plus-panel-group.is-collapsed .gitee-sync-plus-panel-group-title {
 	color: var(--text-faint);
@@ -178,24 +178,26 @@
 	flex: 0 0 auto;
 	align-items: center;
 	justify-content: center;
-	width: 22px;
-	height: 22px;
+	width: 24px;
+	height: 24px;
 	padding: 0;
 	border: none;
 	background: transparent;
-	color: var(--text-muted);
-	border-radius: 4px;
+	color: var(--icon-color, var(--text-muted));
+	border-radius: var(--clickable-icon-radius, 4px);
+	box-shadow: none;
 	cursor: pointer;
-	font-size: 15px;
+	font-size: 16px;
 	line-height: 1;
 }
 .gitee-sync-plus-panel-icon-btn:hover {
 	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+	color: var(--icon-color-hover, var(--text-normal));
 }
 .gitee-sync-plus-panel-icon-btn svg {
-	width: 15px;
-	height: 15px;
+	width: 16px;
+	height: 16px;
+	color: currentColor;
 }
 /* Per-file actions (e.g. discard) are hidden until the row is hovered, like VS Code. */
 .gitee-sync-plus-panel-item-action {
