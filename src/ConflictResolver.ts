@@ -33,17 +33,7 @@ function decodeText(data: ArrayBuffer): string {
  */
 export class ConflictResolverModal extends Modal {
 	private readonly resolutions = new Map<string, ConflictResolution>();
-	private readonly itemEls = new Map<
-		string,
-		{
-			status: HTMLElement;
-			buttons: {
-				local: HTMLElement;
-				remote: HTMLElement;
-				merge: HTMLElement;
-			};
-		}
-	>();
+	private readonly itemEls = new Map<string, { status: HTMLElement }>();
 	private resolved = false;
 
 	constructor(
@@ -79,59 +69,33 @@ export class ConflictResolverModal extends Modal {
 	private renderItem(parent: HTMLElement, c: ConflictEntry): void {
 		const l = messages();
 		const card = parent.createDiv("gitee-sync-plus-conflict-item");
-		const head = card.createDiv("gitee-sync-plus-conflict-item-head");
-		head.createSpan({
+		card.title = c.path; // tooltip on hover shows full path
+
+		// Status icon dot
+		const status = card.createSpan("gitee-sync-plus-conflict-item-status s-pending");
+		status.setText("\u25CF"); /* ● */
+
+		// Filename (bold)
+		card.createSpan({
 			text: fileBasename(c.path),
 			cls: "gitee-sync-plus-conflict-item-name",
 		});
-		head.createSpan({
+
+		// Filepath (muted)
+		card.createSpan({
 			text: c.path,
 			cls: "gitee-sync-plus-conflict-item-path",
 		});
-		card.createEl("p", {
-			text: c.reason,
-			cls: "gitee-sync-plus-conflict-item-reason",
-		});
 
-		const status = card.createDiv("gitee-sync-plus-conflict-item-status s-pending");
-		status.setText(l.conflictResolvedPending);
-
-		const actions = card.createDiv("gitee-sync-plus-conflict-item-actions");
-		const viewDiff = actions.createEl("button", {
-			text: l.conflictViewDiff,
-			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-view",
-		});
-		const keepLocal = actions.createEl("button", {
-			text: l.conflictUseLocal,
-			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-local",
-		});
-		const useRemote = actions.createEl("button", {
-			text: l.conflictUseRemote,
-			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-remote",
-		});
-		const merge = actions.createEl("button", {
-			text: l.conflictMerge,
-			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-merge",
-		});
-
-		viewDiff.addEventListener("click", () => {
+		// Double-click opens diff view
+		card.addEventListener("dblclick", () => {
 			new ConflictDiffModal(this.app, this.plugin, c, (action) => {
 				this.resolve(c.path, { action });
 				new Notice(action === "local" ? l.conflictResolvedLocal : l.conflictResolvedRemote);
 			}).open();
 		});
-		keepLocal.addEventListener("click", () =>
-			this.resolve(c.path, { action: "local" })
-		);
-		useRemote.addEventListener("click", () =>
-			this.resolve(c.path, { action: "remote" })
-		);
-		merge.addEventListener("click", () => this.openMerge(c));
 
-		this.itemEls.set(c.path, {
-			status,
-			buttons: { local: keepLocal, remote: useRemote, merge },
-		});
+		this.itemEls.set(c.path, { status });
 	}
 
 	private openMerge(c: ConflictEntry): void {
@@ -153,23 +117,20 @@ export class ConflictResolverModal extends Modal {
 		if (!el) return;
 		const l = messages();
 		const res = this.resolutions.get(path);
-		let label = l.conflictResolvedPending;
+		let icon = "\u25CF"; /* ● */
 		let key: "local" | "remote" | "merge" | "pending" = "pending";
 		if (res?.action === "local") {
-			label = l.conflictResolvedLocal;
+			icon = "\u2713"; /* ✓ */
 			key = "local";
 		} else if (res?.action === "remote") {
-			label = l.conflictResolvedRemote;
+			icon = "\u2713"; /* ✓ */
 			key = "remote";
 		} else if (res?.action === "merge") {
-			label = l.conflictResolvedMerge;
+			icon = "\u25C6"; /* ◆ */
 			key = "merge";
 		}
-		el.status.setText(label);
+		el.status.setText(icon);
 		el.status.className = `gitee-sync-plus-conflict-item-status s-${key}`;
-		el.buttons.local.toggleClass("is-selected", key === "local");
-		el.buttons.remote.toggleClass("is-selected", key === "remote");
-		el.buttons.merge.toggleClass("is-selected", key === "merge");
 	}
 
 	private renderFooter(): void {

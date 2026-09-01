@@ -707,11 +707,12 @@
 
 /* ===== Conflict resolver modal ===== */
 .gitee-sync-plus-conflict-modal {
-	width: 560px !important;
-	max-width: 92vw !important;
+	width: auto !important;
+	min-width: 420px;
+	max-width: 90vw !important;
 	display: flex;
 	flex-direction: column;
-	max-height: 80vh;
+	overflow: hidden;
 }
 .gitee-sync-plus-conflict-intro {
 	font-size: 0.85em;
@@ -722,26 +723,39 @@
 .gitee-sync-plus-conflict-list {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	overflow-y: auto;
-	min-height: 0;
-	flex: 1 1 auto;
-	padding-right: 2px;
+	gap: 4px;
 }
+/* Conflict file list item — single row: icon | name | path */
 .gitee-sync-plus-conflict-item {
 	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	padding: 10px 12px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-	background: var(--background-primary);
-}
-.gitee-sync-plus-conflict-item-head {
-	display: flex;
-	align-items: baseline;
+	align-items: center;
 	gap: 8px;
-	min-width: 0;
+	padding: 6px 10px;
+	border-radius: 4px;
+	background: var(--background-primary);
+	cursor: pointer;
+	transition: background-color 0.15s ease;
+}
+.gitee-sync-plus-conflict-item:hover {
+	background: var(--background-modifier-hover);
+}
+.gitee-sync-plus-conflict-item-status {
+	font-size: 0.7em;
+	line-height: 1;
+	flex-shrink: 0;
+	color: var(--text-faint);
+}
+.gitee-sync-plus-conflict-item-status.s-pending {
+	color: var(--text-warning);
+}
+.gitee-sync-plus-conflict-item-status.s-local {
+	color: var(--text-success);
+}
+.gitee-sync-plus-conflict-item-status.s-remote {
+	color: var(--text-accent);
+}
+.gitee-sync-plus-conflict-item-status.s-merge {
+	color: var(--text-warning);
 }
 .gitee-sync-plus-conflict-item-name {
 	font-weight: 600;
@@ -749,47 +763,21 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	flex-shrink: 0;
+	max-width: 140px;
 }
 .gitee-sync-plus-conflict-item-path {
-	font-size: 0.72em;
+	font-size: 0.8em;
 	color: var(--text-faint);
-	word-break: break-all;
-}
-.gitee-sync-plus-conflict-item-reason {
-	font-size: 0.78em;
-	color: var(--text-muted);
-	margin: 0;
-}
-.gitee-sync-plus-conflict-item-status {
-	font-size: 0.78em;
-	font-weight: 600;
-	padding: 2px 8px;
-	border-radius: 4px;
-	align-self: flex-start;
-	background: var(--background-modifier-border);
-	color: var(--text-muted);
-}
-.gitee-sync-plus-conflict-item-status.s-local {
-	background: rgba(var(--color-green-rgb), 0.16);
-	color: var(--text-success);
-}
-.gitee-sync-plus-conflict-item-status.s-remote {
-	background: rgba(var(--color-blue-rgb), 0.16);
-	color: var(--text-accent);
-}
-.gitee-sync-plus-conflict-item-status.s-merge {
-	background: rgba(var(--color-orange-rgb), 0.16);
-	color: var(--text-warning);
-}
-.gitee-sync-plus-conflict-item-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 .gitee-sync-plus-conflict-btn {
-	flex: 1 1 auto;
-	min-width: 84px;
-	padding: 6px 10px;
+	flex: 0 0 auto;
+	padding: 6px 12px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 4px;
 	background: var(--background-primary);
@@ -807,23 +795,23 @@
 	color: var(--text-accent);
 	font-weight: 600;
 }
-.gitee-sync-plus-conflict-btn-merge {
-	border-color: rgba(var(--color-orange-rgb), 0.5);
-}
 .gitee-sync-plus-conflict-footer {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	flex-direction: column;
 	gap: 10px;
-	margin-top: 14px;
+	margin-top: 16px;
 	padding-top: 12px;
 	border-top: 1px solid var(--background-modifier-border);
-	flex: 0 0 auto;
 }
-.gitee-sync-plus-conflict-footer-left,
+.gitee-sync-plus-conflict-footer-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
 .gitee-sync-plus-conflict-footer-right {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 8px;
 }
 .gitee-sync-plus-conflict-pending {
