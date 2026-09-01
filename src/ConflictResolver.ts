@@ -89,9 +89,15 @@ export class ConflictResolverModal extends Modal {
 
 		// Double-click opens diff view
 		card.addEventListener("dblclick", () => {
-			new ConflictDiffModal(this.app, this.plugin, c, (action) => {
-				this.resolve(c.path, { action });
-				new Notice(action === "local" ? l.conflictResolvedLocal : l.conflictResolvedRemote);
+			new ConflictDiffModal(this.app, this.plugin, c, (res) => {
+				this.resolve(c.path, res);
+				new Notice(
+					res.action === "local"
+						? l.conflictResolvedLocal
+						: res.action === "remote"
+							? l.conflictResolvedRemote
+							: l.conflictResolvedMerge
+				);
 			}).open();
 		});
 
@@ -456,10 +462,15 @@ export class ConflictDiffModal extends Modal {
 	private statEl!: HTMLElement;
 	private layoutBtn!: HTMLButtonElement;
 	private collapseBtn!: HTMLButtonElement;
+	private applyMergeBtn!: HTMLButtonElement;
 	private layout: "side-by-side" | "vertical" = "side-by-side";
 	private collapseUnchanged = true;
 	private rows: DiffRow[] = [];
-	private rolledBack = new Set<number>();
+	/** Per-row resolution for the line-level merge. Keyed by DiffRow index.
+	 *  A row not present here falls back to `entry.preferred`. */
+	private lineChoices = new Map<number, "local" | "remote">();
+	/** Line ending used when reassembling merged content (preserves CRLF files). */
+	private eol = "\n";
 	private loaded = false;
 	private readonly contextLines = 2;
 
@@ -467,7 +478,7 @@ export class ConflictDiffModal extends Modal {
 		app: App,
 		private readonly plugin: CloudSyncPlugin,
 		private readonly entry: ConflictEntry,
-		private readonly onResolve: (action: "local" | "remote") => void
+		private readonly onResolve: (resolution: ConflictResolution) => void
 	) {
 		super(app);
 	}
@@ -524,7 +535,7 @@ export class ConflictDiffModal extends Modal {
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-local",
 		});
 		keepLocal.addEventListener("click", () => {
-			this.onResolve("local");
+			this.onResolve({ action: "local" });
 			this.close();
 		});
 		const useRemote = right.createEl("button", {
@@ -532,9 +543,19 @@ export class ConflictDiffModal extends Modal {
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-remote",
 		});
 		useRemote.addEventListener("click", () => {
-			this.onResolve("remote");
+			this.onResolve({ action: "remote" });
 			this.close();
 		});
+		const applyMerge = right.createEl("button", {
+			text: l.conflictApplyMerge,
+			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-merge mod-cta",
+		});
+		applyMerge.addEventListener("click", () => {
+			this.onResolve({ action: "merge", content: this.assembleMerge() });
+			this.close();
+		});
+		this.applyMergeBtn = applyMerge;
+		this.updateApplyMergeBtn();
 
 		this.updateLayoutButton();
 		this.updateCollapseButton();
@@ -556,11 +577,59 @@ export class ConflictDiffModal extends Modal {
 		this.collapseBtn.toggleClass("is-active", this.collapseUnchanged);
 	}
 
+	/** Toggle a per-row choice; clicking the already-selected side clears it. */
+	private toggleChoice(index: number, side: "local" | "remote"): void {
+		if (this.lineChoices.get(index) === side) this.lineChoices.delete(index);
+		else this.lineChoices.set(index, side);
+		this.render();
+	}
+
+	/** Enable the "Apply merge" button only when at least one row is chosen,
+	 * and reflect the chosen count on its label. */
+	private updateApplyMergeBtn(): void {
+		if (!this.applyMergeBtn) return;
+		const l = messages();
+		const count = this.lineChoices.size;
+		this.applyMergeBtn.disabled = count === 0;
+		this.applyMergeBtn.toggleClass("is-disabled", count === 0);
+		this.applyMergeBtn.setText(count > 0 ? `${l.conflictApplyMerge} (${count})` : l.conflictApplyMerge);
+	}
+
+	/** Build the merged file content from per-row choices. Untouched rows fall
+	 *  back to `entry.preferred`; equal rows always keep their text. A choice
+	 *  pointing at an empty side (e.g. accept-local on an insert) drops the row. */
+	private assembleMerge(): string {
+		const out: string[] = [];
+		for (let i = 0; i < this.rows.length; i++) {
+			const r = this.rows[i];
+			if (r.state === "equal") {
+				out.push(r.oldText);
+				continue;
+			}
+			const side = this.lineChoices.get(i) ?? this.entry.preferred;
+			if (side === "local") {
+				if (r.oldLine > 0) out.push(r.oldText);
+			} else {
+				if (r.newLine > 0) out.push(r.newText);
+			}
+		}
+		return out.join(this.eol);
+	}
+
+	/** Infer the dominant line ending so merged output matches the source file. */
+	private detectEol(sample: string): string {
+		if (!sample) return "\n";
+		const crlf = (sample.match(/\r\n/g) ?? []).length;
+		const lf = (sample.replace(/\r\n/g, "").match(/\n/g) ?? []).length;
+		return crlf > 0 && crlf >= lf ? "\r\n" : "\n";
+	}
+
 	private async loadAndRender(): Promise<void> {
 		const l = messages();
 		try {
 			const { local, remote } = await this.loadText();
-			const localLines = splitLines(local);
+			this.eol = this.detectEol(local || remote);
+		const localLines = splitLines(local);
 			const remoteLines = splitLines(remote);
 			this.rows = computeDiffRows(localLines, remoteLines);
 			this.loaded = true;
@@ -604,6 +673,7 @@ export class ConflictDiffModal extends Modal {
 		else this.renderVertical();
 
 		this.renderStat();
+		this.updateApplyMergeBtn();
 	}
 
 	private renderStat(): void {
@@ -618,7 +688,12 @@ export class ConflictDiffModal extends Modal {
 				ins++;
 			}
 		}
-		this.statEl.setText(l.conflictDiffStats(del, ins));
+		const picked = this.lineChoices.size;
+		this.statEl.setText(
+			picked > 0
+				? `${l.conflictDiffStats(del, ins)} · ${l.diffAcceptedHint(picked)}`
+				: l.conflictDiffStats(del, ins)
+		);
 	}
 
 	private buildSegments(): Array<{ type: "equal" | "diff"; start: number; end: number }> {
@@ -646,8 +721,10 @@ export class ConflictDiffModal extends Modal {
 			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-wide"
 		);
 		const header = section.createDiv("gitee-sync-plus-diff-section-labels");
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: l.diffRightRemote });
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffLeftLocal });
+		// Column order follows computeDiffRows(localLines, remoteLines):
+		// oldText (LOCAL) renders on the left, newText (REMOTE) on the right.
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: l.diffLeftLocal });
+		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffRightRemote });
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
 		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
 
@@ -740,7 +817,6 @@ export class ConflictDiffModal extends Modal {
 			localPh.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
 			localPh.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
 
-			const frag = document.createDocumentFragment();
 			const fragRemote = document.createDocumentFragment();
 			const fragLocal = document.createDocumentFragment();
 			for (let i = seg.start + ctx; i <= seg.end - ctx; i++) {
@@ -783,12 +859,12 @@ export class ConflictDiffModal extends Modal {
 	): { remoteEl: HTMLTableRowElement; localEl: HTMLTableRowElement } {
 		const l = messages();
 		const cls = collapsible ? " gitee-sync-plus-diff-collapsible" : "";
+		const choice = this.lineChoices.get(rowIndex);
 
-		/* Remote row (newText / right side) */
+		/* Remote row (newText / newLine) — top panel */
 		const remoteTr = document.createElement("tr");
 		remoteTr.className =
 			`gitee-sync-plus-diff-row${cls} ${row.newLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
-		if (this.rolledBack.has(rowIndex)) remoteTr.addClass("is-rolled-back");
 		const remoteNum = document.createElement("td");
 		remoteNum.className = "gitee-sync-plus-diff-num";
 		remoteNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
@@ -797,11 +873,10 @@ export class ConflictDiffModal extends Modal {
 		remoteCell.textContent = row.newText;
 		remoteTr.append(remoteNum, remoteCell);
 
-		/* Local row (oldText / left side) */
+		/* Local row (oldText / oldLine) — bottom panel */
 		const localTr = document.createElement("tr");
 		localTr.className =
 			`gitee-sync-plus-diff-row${cls} ${row.oldLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
-		if (this.rolledBack.has(rowIndex)) localTr.addClass("is-rolled-back");
 		const localNum = document.createElement("td");
 		localNum.className = "gitee-sync-plus-diff-num";
 		localNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
@@ -810,20 +885,43 @@ export class ConflictDiffModal extends Modal {
 		localCell.textContent = row.oldText;
 		localTr.append(localNum, localCell);
 
-		/* Inline rollback button on LOCAL side only (matches ConflictDiffModal convention:
-		   user rolls back to reject a remote change and keep their local line). */
+		/* One accept button per side, inline in the num cell: the remote button
+		   lives on the remote (top) row, the local button on the local (bottom)
+		   row. The button is offered even when that side is a placeholder, so
+		   "accept local" on a remote insert (= drop it) stays reachable. */
 		if (row.state !== "equal") {
-			const rbBtn = localNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-revert-btn",
-				title: l.diffRollback,
+			const acceptRemote = remoteNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-remote",
+				title: l.diffAcceptRemote,
 			});
-			rbBtn.textContent = "\u21A9"; /* ↩ */
-			rbBtn.addEventListener("click", (evt) => {
+			acceptRemote.textContent = "\u2713"; /* ✓ */
+			acceptRemote.toggleClass("is-selected", choice === "remote");
+			acceptRemote.addEventListener("click", (evt) => {
 				evt.stopPropagation();
-				if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
-				else this.rolledBack.add(rowIndex);
-				this.render();
+				this.toggleChoice(rowIndex, "remote");
 			});
+			remoteTr.addClass("has-choice");
+
+			const acceptLocal = localNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-local",
+				title: l.diffAcceptLocal,
+			});
+			acceptLocal.textContent = "\u2713"; /* ✓ */
+			acceptLocal.toggleClass("is-selected", choice === "local");
+			acceptLocal.addEventListener("click", (evt) => {
+				evt.stopPropagation();
+				this.toggleChoice(rowIndex, "local");
+			});
+			localTr.addClass("has-choice");
+
+			/* Visual state: accepted side is highlighted, the other is dimmed. */
+			if (choice === "remote") {
+				remoteTr.addClass("is-accepted");
+				localTr.addClass("is-rejected");
+			} else if (choice === "local") {
+				localTr.addClass("is-accepted");
+				remoteTr.addClass("is-rejected");
+			}
 		}
 
 		return { remoteEl: remoteTr, localEl: localTr };
@@ -835,7 +933,6 @@ export class ConflictDiffModal extends Modal {
 		tr.className =
 			(collapsible ? "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible " : "gitee-sync-plus-diff-row ") +
 			`state-${row.state}`;
-		if (this.rolledBack.has(rowIndex)) tr.addClass("is-rolled-back");
 
 		const leftNum = document.createElement("td");
 		leftNum.className = "gitee-sync-plus-diff-num";
@@ -851,22 +948,47 @@ export class ConflictDiffModal extends Modal {
 		rightCell.textContent = row.newText;
 		tr.append(leftNum, leftCell, rightNum, rightCell);
 
-		// Inline rollback button on the LOCAL side (right num cell). Matches
-		// the tab view (DiffView.ts) where the revert button is appended into
-		// the num cell rather than living in its own column, so the diff
-		// layout stays a clean 4-column side-by-side.
+		// Inline per-row accept buttons, one on each side, placed inside the
+		// num cell so the 4-column side-by-side layout is preserved. Local side
+		// = left (oldText); remote side = right (newText).
 		if (row.state !== "equal") {
-			const rbBtn = rightNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-revert-btn",
-				title: l.diffRollback,
+			const choice = this.lineChoices.get(rowIndex);
+			tr.addClass("has-choice");
+
+			const acceptLocal = leftNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-local",
+				title: l.diffAcceptLocal,
 			});
-			rbBtn.textContent = "\u21A9"; /* ↩ */
-			rbBtn.addEventListener("click", (evt) => {
+			acceptLocal.textContent = "\u2713"; /* ✓ */
+			acceptLocal.toggleClass("is-selected", choice === "local");
+			acceptLocal.addEventListener("click", (evt) => {
 				evt.stopPropagation();
-				if (this.rolledBack.has(rowIndex)) this.rolledBack.delete(rowIndex);
-				else this.rolledBack.add(rowIndex);
-				this.render();
+				this.toggleChoice(rowIndex, "local");
 			});
+
+			const acceptRemote = rightNum.createEl("button", {
+				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-remote",
+				title: l.diffAcceptRemote,
+			});
+			acceptRemote.textContent = "\u2713"; /* ✓ */
+			acceptRemote.toggleClass("is-selected", choice === "remote");
+			acceptRemote.addEventListener("click", (evt) => {
+				evt.stopPropagation();
+				this.toggleChoice(rowIndex, "remote");
+			});
+
+			// Accepted side is highlighted, the rejected side is dimmed.
+			if (choice === "local") {
+				leftNum.addClass("is-accepted");
+				leftCell.addClass("is-accepted");
+				rightNum.addClass("is-rejected");
+				rightCell.addClass("is-rejected");
+			} else if (choice === "remote") {
+				rightNum.addClass("is-accepted");
+				rightCell.addClass("is-accepted");
+				leftNum.addClass("is-rejected");
+				leftCell.addClass("is-rejected");
+			}
 		}
 
 		return tr;

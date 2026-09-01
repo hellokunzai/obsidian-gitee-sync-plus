@@ -801,7 +801,9 @@
 }
 .gitee-sync-plus-conflict-footer {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
 	gap: 10px;
 	margin-top: 16px;
 	padding-top: 12px;
@@ -958,6 +960,90 @@
     background: var(--background-modifier-active-hover);
     color: var(--text-accent);
     border-color: var(--text-accent);
+}
+
+/* ===== Per-row "accept local / accept remote" buttons (line-level merge) =====
+   Both buttons live inside their own num cell (absolute-positioned, right
+   aligned) so the 4-column side-by-side layout stays intact and the line
+   number text is never covered. The wide-num variant above reserves the
+   30px padding-right these buttons need.
+
+   Local side = left/first num cell (oldText). Remote side = right/second num
+   cell (newText). In vertical layout the same classes apply per row. */
+.gitee-sync-plus-diff-accept-btn {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 20px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    opacity: 1;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+        background 0.15s ease;
+}
+/* Buttons are always visible: picking a side per row is the primary action
+   here, so hiding them behind :hover made them undiscoverable. */
+.gitee-sync-plus-diff-accept-btn:focus-visible {
+    opacity: 1;
+}
+.gitee-sync-plus-diff-accept-btn:hover {
+    color: var(--text-accent);
+    background: var(--background-modifier-hover);
+    border-color: var(--text-accent);
+    opacity: 1;
+}
+.gitee-sync-plus-diff-accept-btn.is-selected {
+    color: var(--text-on-accent, #fff);
+    background: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    opacity: 1;
+}
+
+/* Chosen-row feedback: the accepted side is tinted with an accent edge, the
+   rejected side is dimmed. Applies to whole rows (vertical layout) and to
+   individual cells (side-by-side layout). */
+.gitee-sync-plus-diff-row.is-accepted > td,
+.gitee-sync-plus-diff-num.is-accepted,
+.gitee-sync-plus-diff-cell.is-accepted {
+    background: var(--background-modifier-hover);
+    box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+.gitee-sync-plus-diff-row.is-rejected,
+.gitee-sync-plus-diff-num.is-rejected,
+.gitee-sync-plus-diff-cell.is-rejected {
+    opacity: 0.4;
+}
+
+/* Vertical layout: each panel is its own 2-column table, so the num column
+   can be wider without squeezing the content column. Reserve the same 30px
+   gutter so the accept button never covers the line number. */
+.gitee-sync-plus-diff-files-vertical .gitee-sync-plus-diff-num {
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    padding-right: 30px;
+    box-sizing: border-box;
+}
+
+/* Disabled state for the "Apply merge" button until a row is chosen */
+.gitee-sync-plus-conflict-btn.is-disabled,
+.gitee-sync-plus-conflict-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 /* ===== Merge editor modal ===== */

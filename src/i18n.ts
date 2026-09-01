@@ -211,6 +211,10 @@ const en = {
 	diffLayoutToggle: "Switch diff layout",
 	diffCollapseUnchanged: "Collapse unchanged fragments",
 	diffRollback: "Rollback this change",
+	diffAcceptLocal: "Accept local",
+	diffAcceptRemote: "Accept remote",
+	diffAcceptedHint: (n: number) =>
+		`${n} line(s) accepted — click "Apply merge" to write the combined result.`,
 	diffIdenticalHint:
 		"Local and remote contents are identical (only line endings or the sync state differ).",
 	diffMarkSynced: "Mark as synced",
@@ -240,6 +244,7 @@ const en = {
 		`${n} file(s) changed on both sides since the last sync. Resolve each conflict, then confirm the pull.`,
 	conflictUseLocal: "Keep local",
 	conflictUseRemote: "Use remote",
+	conflictApplyMerge: "Apply merge",
 	conflictMerge: "Merge…",
 	conflictViewDiff: "View diff",
 	conflictResolvedLocal: "Kept local",
@@ -470,6 +475,9 @@ const zh: typeof en = {
 	diffLayoutToggle: "切换差异布局",
 	diffCollapseUnchanged: "收起未更改的片段",
 	diffRollback: "回滚此变更",
+	diffAcceptLocal: "接受本地",
+	diffAcceptRemote: "接受远端",
+	diffAcceptedHint: (n: number) => `已接受 ${n} 行——点击「应用合并」写入合并结果。`,
 	diffIdenticalHint:
 		"本地与远端内容完全一致（仅换行符或同步状态不同）。",
 	diffMarkSynced: "标记为已同步",
@@ -498,6 +506,7 @@ const zh: typeof en = {
 	conflictIntro: (n) => `自上次同步以来，有 ${n} 个文件在两端都被修改。请逐一解决冲突后再确认拉取。`,
 	conflictUseLocal: "保留本地",
 	conflictUseRemote: "使用远端",
+	conflictApplyMerge: "应用合并",
 	conflictMerge: "合并…",
 	conflictViewDiff: "查看差异",
 	conflictResolvedLocal: "已保留本地",
