@@ -867,7 +867,10 @@ export class ConflictDiffModal extends Modal {
 			`gitee-sync-plus-diff-row${cls} ${row.newLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
 		const remoteNum = document.createElement("td");
 		remoteNum.className = "gitee-sync-plus-diff-num";
-		remoteNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
+		const remoteNumText = remoteNum.createEl("span", {
+			cls: "gitee-sync-plus-diff-num-text",
+		});
+		remoteNumText.textContent = row.newLine > 0 ? String(row.newLine) : "";
 		const remoteCell = document.createElement("td");
 		remoteCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		remoteCell.textContent = row.newText;
@@ -879,7 +882,10 @@ export class ConflictDiffModal extends Modal {
 			`gitee-sync-plus-diff-row${cls} ${row.oldLine > 0 ? `state-${row.state}` : "state-placeholder"}`;
 		const localNum = document.createElement("td");
 		localNum.className = "gitee-sync-plus-diff-num";
-		localNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
+		const localNumText = localNum.createEl("span", {
+			cls: "gitee-sync-plus-diff-num-text",
+		});
+		localNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const localCell = document.createElement("td");
 		localCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		localCell.textContent = row.oldText;
@@ -936,13 +942,27 @@ export class ConflictDiffModal extends Modal {
 
 		const leftNum = document.createElement("td");
 		leftNum.className = "gitee-sync-plus-diff-num";
-		leftNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
+		const leftNumText = leftNum.createEl("span", {
+			cls: "gitee-sync-plus-diff-num-text",
+		});
+		leftNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const leftCell = document.createElement("td");
 		leftCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		leftCell.textContent = row.oldText;
 		const rightNum = document.createElement("td");
 		rightNum.className = "gitee-sync-plus-diff-num";
-		rightNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
+		const rightNumText = rightNum.createEl("span", {
+			cls: "gitee-sync-plus-diff-num-text",
+		});
+		// When the remote side has no line (e.g. remote-only delete), fall back
+		// to the matching local line number as an anchor so the user can still
+		// see which local row this "accept remote" button corresponds to.
+		rightNumText.textContent =
+			row.newLine > 0
+				? String(row.newLine)
+				: row.oldLine > 0
+					? String(row.oldLine)
+					: "";
 		const rightCell = document.createElement("td");
 		rightCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		rightCell.textContent = row.newText;

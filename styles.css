@@ -383,15 +383,32 @@
 	);
 }
 .gitee-sync-plus-diff-num {
-	width: 36px;
-	min-width: 36px;
-	max-width: 36px;
-	text-align: right;
-	padding: 1px 6px;
-	color: var(--text-faint);
-	background: var(--background-secondary);
-	border-right: 1px solid var(--background-modifier-border);
-	user-select: none;
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    padding: 1px 6px;
+    color: var(--text-faint);
+    background: var(--background-secondary);
+    border-right: 1px solid var(--background-modifier-border);
+    user-select: none;
+    /* Flex layout: row number text on the left (right-aligned within its
+       span), accept button fixed width pinned to the right. This avoids
+       the absolute-positioning + padding-right trap where the button
+       would overlap the line number (absolute anchors against the
+       padding box, so padding doesn't reserve space for an absolute
+       child). */
+    display: flex;
+    align-items: center;
+}
+.gitee-sync-plus-diff-num-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Left-align: keep the row number on the left edge of the num cell
+       so it doesn't visually attach to the accept button on the right.
+       The accept button is the action affordance; the line number is a
+       reference label — putting it on the left makes scanning easier and
+       keeps the gutter visually unambiguous. */
+    text-align: left;
 }
 .gitee-sync-plus-diff-cell {
 	padding: 1px 6px;
@@ -949,7 +966,6 @@
     width: 60px;
     min-width: 60px;
     max-width: 60px;
-    padding-right: 30px;
     box-sizing: border-box;
 }
 /* Row rolled back via the revert button — dim it to show the change is rejected */
@@ -963,18 +979,18 @@
 }
 
 /* ===== Per-row "accept local / accept remote" buttons (line-level merge) =====
-   Both buttons live inside their own num cell (absolute-positioned, right
-   aligned) so the 4-column side-by-side layout stays intact and the line
-   number text is never covered. The wide-num variant above reserves the
-   30px padding-right these buttons need.
+   The button lives inside its own num cell as a normal flex child (not
+   absolute-positioned), pinned to the right edge by the flex layout above.
+   This way the line number text always sits to its left with a guaranteed
+   margin, and the button cannot accidentally overlap it. The num cell is
+   already position: relative (see earlier rule) but we don't need that
+   anymore — flex handles it.
 
    Local side = left/first num cell (oldText). Remote side = right/second num
    cell (newText). In vertical layout the same classes apply per row. */
 .gitee-sync-plus-diff-accept-btn {
-    position: absolute;
-    right: 2px;
-    top: 50%;
-    transform: translateY(-50%);
+    flex: 0 0 auto;
+    margin-left: 4px;
     width: 26px;
     height: 20px;
     padding: 0;
@@ -994,6 +1010,7 @@
     pointer-events: auto;
     transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease,
         background 0.15s ease;
+    box-sizing: border-box;
 }
 /* Buttons are always visible: picking a side per row is the primary action
    here, so hiding them behind :hover made them undiscoverable. */
@@ -1029,13 +1046,13 @@
 }
 
 /* Vertical layout: each panel is its own 2-column table, so the num column
-   can be wider without squeezing the content column. Reserve the same 30px
-   gutter so the accept button never covers the line number. */
+   can be wider without squeezing the content column. The flex layout on the
+   base class handles button + line-number spacing, so no padding gymnastics
+   are needed here. */
 .gitee-sync-plus-diff-files-vertical .gitee-sync-plus-diff-num {
     width: 72px;
     min-width: 72px;
     max-width: 72px;
-    padding-right: 30px;
     box-sizing: border-box;
 }
 
