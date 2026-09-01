@@ -724,6 +724,10 @@
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	height: 210px; /* fixed height for exactly 5 items */
+	overflow-y: auto;
+	overflow-x: hidden;
+	flex-shrink: 0;
 }
 /* Conflict file list item — single row: icon | name | path */
 .gitee-sync-plus-conflict-item {
