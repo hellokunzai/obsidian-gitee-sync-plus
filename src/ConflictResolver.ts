@@ -619,8 +619,8 @@ export class ConflictDiffModal extends Modal {
 	}
 
 	/** Enable "Apply merge" only after every conflicting row is explicitly
-	 * picked. Until then the button stays disabled and its label reports how
-	 * many rows are still unresolved. */
+	 * picked. The label stays constant; the remaining-row count is reported by
+	 * the footer status line instead of bloating the button. */
 	private updateApplyMergeBtn(): void {
 		if (!this.applyMergeBtn) return;
 		const l = messages();
@@ -629,11 +629,7 @@ export class ConflictDiffModal extends Modal {
 		const ready = total > 0 && unresolved === 0;
 		this.applyMergeBtn.disabled = !ready;
 		this.applyMergeBtn.toggleClass("is-disabled", !ready);
-		this.applyMergeBtn.setText(
-			unresolved > 0
-				? `${l.conflictApplyMerge} (${l.conflictApplyMergeRemaining(unresolved)})`
-				: l.conflictApplyMerge
-		);
+		this.applyMergeBtn.setText(l.conflictApplyMerge);
 	}
 
 	/** Build the merged file content from per-row choices. Untouched rows fall
@@ -733,12 +729,14 @@ export class ConflictDiffModal extends Modal {
 				ins++;
 			}
 		}
+		// The "N rows unresolved" hint used to live on the "Apply merge"
+		// button; it now reads here so the button keeps a short label.
+		const unresolved = this.conflictRowCount() - this.pickedRowCount();
+		const parts = [l.conflictDiffStats(del, ins)];
+		if (unresolved > 0) parts.push(l.conflictDiffRemaining(unresolved));
 		const picked = this.lineChoices.size;
-		this.statEl.setText(
-			picked > 0
-				? `${l.conflictDiffStats(del, ins)} · ${l.diffAcceptedHint(picked)}`
-				: l.conflictDiffStats(del, ins)
-		);
+		if (picked > 0) parts.push(l.diffAcceptedHint(picked));
+		this.statEl.setText(parts.join(" · "));
 	}
 
 	private buildSegments(): Array<{ type: "equal" | "diff"; start: number; end: number }> {
