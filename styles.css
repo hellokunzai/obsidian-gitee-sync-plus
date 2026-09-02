@@ -876,6 +876,20 @@
 	background: var(--background-primary);
 }
 
+/* Confirm-pull (mod-cta) disabled until every conflict is resolved.
+   Obsidian's built-in .mod-cta doesn't visually grey out on :disabled, so we
+   scope a clear disabled style to the conflict modal footer. */
+.gitee-sync-plus-conflict-footer .mod-cta:disabled,
+.gitee-sync-plus-conflict-footer .mod-cta.is-disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	filter: grayscale(1);
+}
+.gitee-sync-plus-conflict-footer .mod-cta:disabled:hover {
+	background: var(--interactive-accent);
+	filter: grayscale(1);
+}
+
 /* ===== In-modal conflict diff viewer ===== */
 .gitee-sync-plus-conflict-diff-modal {
 	display: flex;

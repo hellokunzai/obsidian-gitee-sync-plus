@@ -162,11 +162,6 @@ export class ConflictResolverModal extends Modal {
 		this.pendingEl = right.createSpan({
 			cls: "gitee-sync-plus-conflict-pending",
 		});
-		const cancel = right.createEl("button", {
-			text: l.cancel,
-			cls: "mod-cancel",
-		});
-		cancel.addEventListener("click", () => this.close());
 		this.confirmBtn = right.createEl("button", {
 			text: l.conflictConfirmPull,
 			cls: "mod-cta",
