@@ -538,24 +538,21 @@ export class ConflictDiffModal extends Modal {
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-local",
 		});
 		keepLocal.addEventListener("click", () => {
-			this.onResolve({ action: "local" });
-			this.close();
+			this.setAllChoices("local");
 		});
 		const useRemote = right.createEl("button", {
 			text: l.conflictUseRemote,
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-remote",
 		});
 		useRemote.addEventListener("click", () => {
-			this.onResolve({ action: "remote" });
-			this.close();
+			this.setAllChoices("remote");
 		});
 		const applyMerge = right.createEl("button", {
 			text: l.conflictApplyMerge,
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-merge mod-cta",
 		});
 		applyMerge.addEventListener("click", () => {
-			this.onResolve({ action: "merge", content: this.assembleMerge() });
-			this.close();
+			this.applyMerge();
 		});
 		this.applyMergeBtn = applyMerge;
 		this.updateApplyMergeBtn();
@@ -580,22 +577,63 @@ export class ConflictDiffModal extends Modal {
 		this.collapseBtn.toggleClass("is-active", this.collapseUnchanged);
 	}
 
-	/** Toggle a per-row choice; clicking the already-selected side clears it. */
-	private toggleChoice(index: number, side: "local" | "remote"): void {
-		if (this.lineChoices.get(index) === side) this.lineChoices.delete(index);
-		else this.lineChoices.set(index, side);
+	/** Update a per-row choice from a checkbox change event. */
+	private onCheckboxChange(index: number, side: "local" | "remote", checked: boolean): void {
+		if (checked) this.lineChoices.set(index, side);
+		else if (this.lineChoices.get(index) === side) this.lineChoices.delete(index);
 		this.render();
 	}
 
-	/** Enable the "Apply merge" button only when at least one row is chosen,
-	 * and reflect the chosen count on its label. */
+	/** Count conflicting rows (those that need an explicit choice). */
+	private conflictRowCount(): number {
+		let total = 0;
+		for (const r of this.rows) if (r.state !== "equal") total++;
+		return total;
+	}
+
+	/** Number of conflicting rows that have been explicitly picked. */
+	private pickedRowCount(): number {
+		let picked = 0;
+		for (let i = 0; i < this.rows.length; i++) {
+			if (this.rows[i].state !== "equal" && this.lineChoices.has(i)) picked++;
+		}
+		return picked;
+	}
+
+	/** Batch-set every conflicting row to the given side. Mirrors the per-row
+	 * accept buttons but applies to the whole file at once; the merge is only
+	 * finalized when the user clicks "Apply merge". */
+	private setAllChoices(side: "local" | "remote"): void {
+		for (let i = 0; i < this.rows.length; i++) {
+			if (this.rows[i].state !== "equal") this.lineChoices.set(i, side);
+		}
+		this.render();
+	}
+
+	/** Apply the merge only after every conflicting row is resolved. */
+	private applyMerge(): void {
+		const total = this.conflictRowCount();
+		if (total === 0 || this.pickedRowCount() < total) return;
+		this.onResolve({ action: "merge", content: this.assembleMerge() });
+		this.close();
+	}
+
+	/** Enable "Apply merge" only after every conflicting row is explicitly
+	 * picked. Until then the button stays disabled and its label reports how
+	 * many rows are still unresolved. */
 	private updateApplyMergeBtn(): void {
 		if (!this.applyMergeBtn) return;
 		const l = messages();
-		const count = this.lineChoices.size;
-		this.applyMergeBtn.disabled = count === 0;
-		this.applyMergeBtn.toggleClass("is-disabled", count === 0);
-		this.applyMergeBtn.setText(count > 0 ? `${l.conflictApplyMerge} (${count})` : l.conflictApplyMerge);
+		const total = this.conflictRowCount();
+		const unresolved = total - this.pickedRowCount();
+		const ready = total > 0 && unresolved === 0;
+		this.applyMergeBtn.disabled = !ready;
+		this.applyMergeBtn.toggleClass("is-disabled", !ready);
+		this.applyMergeBtn.setText(
+			unresolved > 0
+				? `${l.conflictApplyMerge} (${l.conflictApplyMergeRemaining(unresolved)})`
+				: l.conflictApplyMerge
+		);
 	}
 
 	/** Build the merged file content from per-row choices. Untouched rows fall
@@ -912,27 +950,27 @@ export class ConflictDiffModal extends Modal {
 		   row. The button is offered even when that side is a placeholder, so
 		   "accept local" on a remote insert (= drop it) stays reachable. */
 		if (row.state !== "equal") {
-			const acceptRemote = remoteNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-remote",
+			const acceptRemote = remoteNum.createEl("input", {
+				type: "checkbox",
+				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-remote",
 				title: l.diffAcceptRemote,
 			});
-			acceptRemote.textContent = "\u2713"; /* ✓ */
-			acceptRemote.toggleClass("is-selected", choice === "remote");
-			acceptRemote.addEventListener("click", (evt) => {
+			acceptRemote.checked = choice === "remote";
+			acceptRemote.addEventListener("change", (evt) => {
 				evt.stopPropagation();
-				this.toggleChoice(rowIndex, "remote");
+				this.onCheckboxChange(rowIndex, "remote", acceptRemote.checked);
 			});
 			remoteTr.addClass("has-choice");
 
-			const acceptLocal = localNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-local",
+			const acceptLocal = localNum.createEl("input", {
+				type: "checkbox",
+				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-local",
 				title: l.diffAcceptLocal,
 			});
-			acceptLocal.textContent = "\u2713"; /* ✓ */
-			acceptLocal.toggleClass("is-selected", choice === "local");
-			acceptLocal.addEventListener("click", (evt) => {
+			acceptLocal.checked = choice === "local";
+			acceptLocal.addEventListener("change", (evt) => {
 				evt.stopPropagation();
-				this.toggleChoice(rowIndex, "local");
+				this.onCheckboxChange(rowIndex, "local", acceptLocal.checked);
 			});
 			localTr.addClass("has-choice");
 
@@ -997,26 +1035,26 @@ export class ConflictDiffModal extends Modal {
 			const choice = this.lineChoices.get(rowIndex);
 			tr.addClass("has-choice");
 
-			const acceptLocal = leftNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-local",
+			const acceptLocal = leftNum.createEl("input", {
+				type: "checkbox",
+				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-local",
 				title: l.diffAcceptLocal,
 			});
-			acceptLocal.textContent = "\u2713"; /* ✓ */
-			acceptLocal.toggleClass("is-selected", choice === "local");
-			acceptLocal.addEventListener("click", (evt) => {
+			acceptLocal.checked = choice === "local";
+			acceptLocal.addEventListener("change", (evt) => {
 				evt.stopPropagation();
-				this.toggleChoice(rowIndex, "local");
+				this.onCheckboxChange(rowIndex, "local", acceptLocal.checked);
 			});
 
-			const acceptRemote = rightNum.createEl("button", {
-				cls: "gitee-sync-plus-diff-accept-btn gitee-sync-plus-diff-accept-remote",
+			const acceptRemote = rightNum.createEl("input", {
+				type: "checkbox",
+				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-remote",
 				title: l.diffAcceptRemote,
 			});
-			acceptRemote.textContent = "\u2713"; /* ✓ */
-			acceptRemote.toggleClass("is-selected", choice === "remote");
-			acceptRemote.addEventListener("click", (evt) => {
+			acceptRemote.checked = choice === "remote";
+			acceptRemote.addEventListener("change", (evt) => {
 				evt.stopPropagation();
-				this.toggleChoice(rowIndex, "remote");
+				this.onCheckboxChange(rowIndex, "remote", acceptRemote.checked);
 			});
 
 			// Accepted side is highlighted, the rejected side is dimmed.

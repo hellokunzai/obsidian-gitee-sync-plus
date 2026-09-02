@@ -1012,46 +1012,20 @@
 
    Local side = left/first num cell (oldText). Remote side = right/second num
    cell (newText). In vertical layout the same classes apply per row. */
-.gitee-sync-plus-diff-accept-btn {
+.gitee-sync-plus-diff-accept-checkbox {
     flex: 0 0 auto;
     margin-left: 4px;
-    width: 26px;
-    height: 20px;
-    padding: 0;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-    opacity: 1;
+    width: 18px;
+    height: 18px;
     cursor: pointer;
-    pointer-events: auto;
-    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease,
-        background 0.15s ease;
-    box-sizing: border-box;
+    accent-color: var(--interactive-accent);
+    transition: transform 0.15s ease;
 }
-/* Buttons are always visible: picking a side per row is the primary action
-   here, so hiding them behind :hover made them undiscoverable. */
-.gitee-sync-plus-diff-accept-btn:focus-visible {
-    opacity: 1;
+.gitee-sync-plus-diff-accept-checkbox:hover {
+    transform: scale(1.1);
 }
-.gitee-sync-plus-diff-accept-btn:hover {
-    color: var(--text-accent);
-    background: var(--background-modifier-hover);
-    border-color: var(--text-accent);
-    opacity: 1;
-}
-.gitee-sync-plus-diff-accept-btn.is-selected {
-    color: var(--text-on-accent, #fff);
-    background: var(--interactive-accent);
-    border-color: var(--interactive-accent);
-    opacity: 1;
+.gitee-sync-plus-diff-accept-checkbox:checked {
+    accent-color: var(--interactive-accent);
 }
 
 /* Chosen-row feedback: the accepted side is tinted with an accent edge, the
