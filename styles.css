@@ -950,14 +950,22 @@
 .gitee-sync-plus-diff-files-vertical {
 	flex-direction: column !important;
 }
+/* Shared pane styles for the conflict diff sections. Height capping is
+   applied only in the vertical layout; without the scope, side-by-side panes
+   were capped at 50% of the body height, leaving a large blank area below
+   the diff table. */
 .gitee-sync-plus-diff-section-remote,
 .gitee-sync-plus-diff-section-local {
 	flex: 1 1 auto;
-	max-height: 50%;
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 	background: var(--background-primary);
+}
+/* Vertical (top/bottom) diff layout: each pane takes at most half the body. */
+.gitee-sync-plus-diff-files-vertical .gitee-sync-plus-diff-section-remote,
+.gitee-sync-plus-diff-files-vertical .gitee-sync-plus-diff-section-local {
+	max-height: 50%;
 }
 .gitee-sync-plus-diff-section-remote + .gitee-sync-plus-diff-section-local {
 	border-top: 1px solid var(--background-modifier-border);
