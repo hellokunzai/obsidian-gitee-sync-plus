@@ -230,7 +230,6 @@ const en = {
 	statusTagConflict: "⚠",
 
 	conflictDiffTitle: "File diff",
-	conflictDiffBack: "Back",
 	conflictDiffLayoutSide: "Side by side",
 	conflictDiffLayoutUnified: "Unified",
 	conflictDiffCollapse: "Collapse unchanged",
@@ -493,7 +492,6 @@ const zh: typeof en = {
 	statusTagConflict: "⚠",
 
 	conflictDiffTitle: "文件差异",
-	conflictDiffBack: "返回",
 	conflictDiffLayoutSide: "并排",
 	conflictDiffLayoutUnified: "统一",
 	conflictDiffCollapse: "收起未更改",

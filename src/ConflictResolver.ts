@@ -493,11 +493,6 @@ export class ConflictDiffModal extends Modal {
 		contentEl.style.flexDirection = "column";
 
 		const header = contentEl.createDiv("gitee-sync-plus-conflict-diff-header");
-		const back = header.createEl("button", {
-			cls: "gitee-sync-plus-conflict-diff-btn gitee-sync-plus-conflict-diff-back",
-		});
-		back.setText("← " + l.conflictDiffBack);
-		back.addEventListener("click", () => this.close());
 		header.createSpan({
 			text: `${l.conflictDiffTitle} — ${fileBasename(this.entry.path)}`,
 			cls: "gitee-sync-plus-conflict-diff-title",
