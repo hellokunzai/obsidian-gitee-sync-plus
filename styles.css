@@ -799,8 +799,10 @@
 .gitee-sync-plus-conflict-item-status.s-remote {
 	color: var(--text-accent);
 }
+/* Merge resolved: same "handled" green as keep-local, so a merged item is
+   visually distinct from the orange pending state. */
 .gitee-sync-plus-conflict-item-status.s-merge {
-	color: var(--text-warning);
+	color: var(--text-success);
 }
 .gitee-sync-plus-conflict-item-name {
 	font-weight: 600;
