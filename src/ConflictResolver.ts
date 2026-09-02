@@ -473,6 +473,9 @@ export class ConflictDiffModal extends Modal {
 	private eol = "\n";
 	private loaded = false;
 	private readonly contextLines = 2;
+	/** Aborts listeners attached by the drag-to-scroll helper so re-renders
+	 * (layout toggle / collapse) don't leak window-level mouse handlers. */
+	private dragAbort?: AbortController;
 
 	constructor(
 		app: App,
@@ -664,6 +667,10 @@ export class ConflictDiffModal extends Modal {
 		if (!this.loaded) return;
 		const l = messages();
 		this.bodyEl.empty();
+		// Drop drag-scroll listeners from the previous render before the
+		// scroll containers are recreated.
+		this.dragAbort?.abort();
+		this.dragAbort = new AbortController();
 		this.bodyEl.addClass("gitee-sync-plus-diff-content");
 		this.bodyEl.removeClass("layout-side-by-side", "layout-vertical");
 		this.bodyEl.addClass(this.layout === "side-by-side" ? "layout-side-by-side" : "layout-vertical");
@@ -727,6 +734,7 @@ export class ConflictDiffModal extends Modal {
 		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffRightRemote });
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
 		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
+		this.attachDragScroll(scrollBox);
 
 		for (const seg of this.buildSegments()) {
 			const len = seg.end - seg.start + 1;
@@ -778,6 +786,7 @@ export class ConflictDiffModal extends Modal {
 		const remoteTable = remoteScroll.createEl("table", {
 			cls: "gitee-sync-plus-diff-section-table",
 		});
+		this.attachDragScroll(remoteScroll);
 
 		/* Local version panel (bottom) */
 		const localSection = wrapper.createDiv(
@@ -788,6 +797,7 @@ export class ConflictDiffModal extends Modal {
 		const localTable = localScroll.createEl("table", {
 			cls: "gitee-sync-plus-diff-section-table",
 		});
+		this.attachDragScroll(localScroll);
 
 		for (const seg of this.buildSegments()) {
 			const len = seg.end - seg.start + 1;
@@ -873,7 +883,10 @@ export class ConflictDiffModal extends Modal {
 		remoteNumText.textContent = row.newLine > 0 ? String(row.newLine) : "";
 		const remoteCell = document.createElement("td");
 		remoteCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		remoteCell.textContent = row.newText;
+		const remoteText = document.createElement("span");
+		remoteText.className = "gitee-sync-plus-diff-cell-text";
+		remoteText.textContent = row.newText;
+		remoteCell.appendChild(remoteText);
 		remoteTr.append(remoteNum, remoteCell);
 
 		/* Local row (oldText / oldLine) — bottom panel */
@@ -888,7 +901,10 @@ export class ConflictDiffModal extends Modal {
 		localNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const localCell = document.createElement("td");
 		localCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		localCell.textContent = row.oldText;
+		const localText = document.createElement("span");
+		localText.className = "gitee-sync-plus-diff-cell-text";
+		localText.textContent = row.oldText;
+		localCell.appendChild(localText);
 		localTr.append(localNum, localCell);
 
 		/* One accept button per side, inline in the num cell: the remote button
@@ -948,7 +964,10 @@ export class ConflictDiffModal extends Modal {
 		leftNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const leftCell = document.createElement("td");
 		leftCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		leftCell.textContent = row.oldText;
+		const leftText = document.createElement("span");
+		leftText.className = "gitee-sync-plus-diff-cell-text";
+		leftText.textContent = row.oldText;
+		leftCell.appendChild(leftText);
 		const rightNum = document.createElement("td");
 		rightNum.className = "gitee-sync-plus-diff-num";
 		const rightNumText = rightNum.createEl("span", {
@@ -965,7 +984,10 @@ export class ConflictDiffModal extends Modal {
 					: "";
 		const rightCell = document.createElement("td");
 		rightCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		rightCell.textContent = row.newText;
+		const rightText = document.createElement("span");
+		rightText.className = "gitee-sync-plus-diff-cell-text";
+		rightText.textContent = row.newText;
+		rightCell.appendChild(rightText);
 		tr.append(leftNum, leftCell, rightNum, rightCell);
 
 		// Inline per-row accept buttons, one on each side, placed inside the
@@ -1012,6 +1034,71 @@ export class ConflictDiffModal extends Modal {
 		}
 
 		return tr;
+	}
+
+	/**
+	 * Enables click-and-drag horizontal panning on a diff scroll container
+	 * (drag-to-scroll), so a long line that overflows the pane can be revealed
+	 * without hunting for the thin scrollbar. Vertical scrolling stays native.
+	 * A small movement threshold keeps normal clicks / inline buttons working.
+	 * Listeners are tied to this.dragAbort so re-renders don't leak them.
+	 */
+	private attachDragScroll(scroller: HTMLElement): void {
+		if (!this.dragAbort) this.dragAbort = new AbortController();
+		const signal = this.dragAbort.signal;
+		const DRAG_THRESHOLD = 4;
+		let isDown = false;
+		let startX = 0;
+		let startScrollLeft = 0;
+		let hasDragged = false;
+
+		scroller.addEventListener(
+			"mousedown",
+			(e: MouseEvent) => {
+				if (e.button !== 0) return;
+				isDown = true;
+				hasDragged = false;
+				startX = e.clientX;
+				startScrollLeft = scroller.scrollLeft;
+				scroller.classList.add("is-dragging");
+			},
+			{ signal }
+		);
+
+		window.addEventListener(
+			"mousemove",
+			(e: MouseEvent) => {
+				if (!isDown) return;
+				const dx = e.clientX - startX;
+				if (Math.abs(dx) > DRAG_THRESHOLD) hasDragged = true;
+				scroller.scrollLeft = startScrollLeft - dx;
+			},
+			{ signal }
+		);
+
+		window.addEventListener(
+			"mouseup",
+			() => {
+				if (!isDown) return;
+				isDown = false;
+				scroller.classList.remove("is-dragging");
+			},
+			{ signal }
+		);
+
+		// Swallow the click that follows a real drag so inline accept buttons
+		// aren't activated by the drag's ending position.
+		scroller.addEventListener(
+			"click",
+			(e: MouseEvent) => {
+				if (hasDragged) {
+					e.stopPropagation();
+					e.preventDefault();
+					hasDragged = false;
+				}
+			},
+			{ capture: true, signal }
+		);
 	}
 
 	onClose(): void {

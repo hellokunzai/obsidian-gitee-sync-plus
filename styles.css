@@ -341,11 +341,24 @@
 	flex: 1;
 	overflow: auto;
 	min-height: 0;
+	/* Drag-to-scroll affordance: hint that the pane can be panned. */
+	cursor: grab;
+}
+/* While panning, swap to the grabbing cursor, suppress text selection, and
+   disable inline buttons so the drag's end position doesn't accidentally
+   trigger accept/revert. */
+.gitee-sync-plus-diff-section-scroll.is-dragging {
+	cursor: grabbing;
+	user-select: none;
+}
+.gitee-sync-plus-diff-section-scroll.is-dragging button {
+	pointer-events: none;
 }
 .gitee-sync-plus-diff-section-table {
-	width: 100%;
+	width: max-content;
+	min-width: 100%;
 	border-collapse: collapse;
-	table-layout: fixed;
+	table-layout: auto;
 	font-family: var(--font-monospace);
 	font-size: 0.82em;
 	line-height: 1.45;
@@ -354,13 +367,13 @@
 	vertical-align: top;
 }
 .gitee-sync-plus-diff-table {
-	width: 100%;
+	width: max-content;
 	min-width: 100%;
 	border-collapse: collapse;
 	font-family: var(--font-monospace);
 	font-size: 0.82em;
 	line-height: 1.45;
-	table-layout: fixed;
+	table-layout: auto;
 }
 .gitee-sync-plus-diff-table td {
 	vertical-align: top;
@@ -371,7 +384,7 @@
 	max-width: 36px;
 }
 .gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell {
-    width: 50%;
+    width: auto;
 }
 .gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell.gitee-sync-plus-diff-empty {
 	background: repeating-linear-gradient(
@@ -413,8 +426,19 @@
 .gitee-sync-plus-diff-cell {
 	padding: 1px 6px;
 	white-space: pre;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	/* Allow long lines to overflow the (fixed-width) cell into the scroll
+	   container so they become horizontally scrollable + drag-pannable,
+	   instead of being silently clipped. */
+	overflow: visible;
+}
+/* Inner span fills the cell for short lines and grows past it for long
+   lines, which is what creates the horizontal overflow that scroll/drag
+   reveal. */
+.gitee-sync-plus-diff-cell-text {
+	display: inline-block;
+	white-space: pre;
+	min-width: 100%;
+	box-sizing: border-box;
 }
 .gitee-sync-plus-diff-row {
 	border-bottom: 1px solid var(--background-modifier-border-hover);

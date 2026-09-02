@@ -74,6 +74,9 @@ export class DiffView extends ItemView {
 	/** Which side of the current diff holds the local version. Used to place
 	 * revert buttons only on the local side. */
 	private localSide: "before" | "after" = "after";
+	/** Aborts listeners attached by the drag-to-scroll helper so repeated
+	 * renders don't leak window-level mouse handlers. */
+	private dragAbort?: AbortController;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -238,6 +241,71 @@ export class DiffView extends ItemView {
 		this.scrollSyncHandler = undefined;
 	}
 
+	/**
+	 * Enables click-and-drag horizontal panning on a diff scroll container
+	 * (drag-to-scroll), so a long line that overflows the pane can be revealed
+	 * without hunting for the thin scrollbar. Vertical scrolling stays native.
+	 * A small movement threshold keeps normal clicks / inline buttons working.
+	 * Listeners are tied to this.dragAbort so re-renders don't leak them.
+	 */
+	private attachDragScroll(scroller: HTMLElement): void {
+		if (!this.dragAbort) this.dragAbort = new AbortController();
+		const signal = this.dragAbort.signal;
+		const DRAG_THRESHOLD = 4;
+		let isDown = false;
+		let startX = 0;
+		let startScrollLeft = 0;
+		let hasDragged = false;
+
+		scroller.addEventListener(
+			"mousedown",
+			(e: MouseEvent) => {
+				if (e.button !== 0) return;
+				isDown = true;
+				hasDragged = false;
+				startX = e.clientX;
+				startScrollLeft = scroller.scrollLeft;
+				scroller.classList.add("is-dragging");
+			},
+			{ signal }
+		);
+
+		window.addEventListener(
+			"mousemove",
+			(e: MouseEvent) => {
+				if (!isDown) return;
+				const dx = e.clientX - startX;
+				if (Math.abs(dx) > DRAG_THRESHOLD) hasDragged = true;
+				scroller.scrollLeft = startScrollLeft - dx;
+			},
+			{ signal }
+		);
+
+		window.addEventListener(
+			"mouseup",
+			() => {
+				if (!isDown) return;
+				isDown = false;
+				scroller.classList.remove("is-dragging");
+			},
+			{ signal }
+		);
+
+		// Swallow the click that follows a real drag so inline accept/revert
+		// buttons aren't activated by the drag's ending position.
+		scroller.addEventListener(
+			"click",
+			(e: MouseEvent) => {
+				if (hasDragged) {
+					e.stopPropagation();
+					e.preventDefault();
+					hasDragged = false;
+				}
+			},
+			{ capture: true, signal }
+		);
+	}
+
 	private updateTitle(): void {
 		const header = this.containerEl.querySelector(".gitee-sync-plus-diff-path");
 		if (header) header.setText(this.getDisplayText());
@@ -372,6 +440,11 @@ export class DiffView extends ItemView {
 		this.lastDiff = { path, beforeText, afterText, beforeLabel, afterLabel };
 		this.localSide = localSide;
 
+		// Drop any drag-scroll listeners from the previous render before the
+		// scroll containers are recreated.
+		this.dragAbort?.abort();
+		this.dragAbort = new AbortController();
+
 		this.diffContentEl.removeClass("layout-side-by-side", "layout-vertical");
 		this.diffContentEl.addClass(`layout-${this.layout}`);
 		this.updateLayoutButton();
@@ -485,6 +558,7 @@ export class DiffView extends ItemView {
 		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
 		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
 		this.sectionScrollEls.push(scrollBox);
+		this.attachDragScroll(scrollBox);
 
 		const segments = this.buildRowSegments(rows);
 
@@ -584,7 +658,10 @@ export class DiffView extends ItemView {
 
 		const leftCell = document.createElement("td");
 		leftCell.className = `gitee-sync-plus-diff-cell ${row.oldLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
-		leftCell.textContent = row.oldText;
+		const leftText = document.createElement("span");
+		leftText.className = "gitee-sync-plus-diff-cell-text";
+		leftText.textContent = row.oldText;
+		leftCell.appendChild(leftText);
 
 		const rightNum = document.createElement("td");
 		rightNum.className = "gitee-sync-plus-diff-num";
@@ -592,7 +669,10 @@ export class DiffView extends ItemView {
 
 		const rightCell = document.createElement("td");
 		rightCell.className = `gitee-sync-plus-diff-cell ${row.newLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
-		rightCell.textContent = row.newText;
+		const rightText = document.createElement("span");
+		rightText.className = "gitee-sync-plus-diff-cell-text";
+		rightText.textContent = row.newText;
+		rightCell.appendChild(rightText);
 
 		tr.append(leftNum, leftCell, rightNum, rightCell);
 
@@ -627,12 +707,14 @@ export class DiffView extends ItemView {
 		const beforeScroll = beforeSection.createDiv("gitee-sync-plus-diff-section-scroll");
 		const beforeTable = beforeScroll.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
 		this.sectionScrollEls.push(beforeScroll);
+		this.attachDragScroll(beforeScroll);
 
 		const afterSection = wrapper.createDiv("gitee-sync-plus-diff-section gitee-sync-plus-diff-section-after");
 		afterSection.createDiv("gitee-sync-plus-diff-section-label").setText(afterLabel);
 		const afterScroll = afterSection.createDiv("gitee-sync-plus-diff-section-scroll");
 		const afterTable = afterScroll.createEl("table", { cls: "gitee-sync-plus-diff-section-table" });
 		this.sectionScrollEls.push(afterScroll);
+		this.attachDragScroll(afterScroll);
 
 		const segments = this.buildRowSegments(rows);
 		if (rows.length <= BATCH_THRESHOLD) {
@@ -747,7 +829,10 @@ export class DiffView extends ItemView {
 		beforeNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const beforeCell = document.createElement("td");
 		beforeCell.className = "gitee-sync-plus-diff-cell";
-		beforeCell.textContent = row.oldLine > 0 ? row.oldText : "";
+		const beforeText = document.createElement("span");
+		beforeText.className = "gitee-sync-plus-diff-cell-text";
+		beforeText.textContent = row.oldLine > 0 ? row.oldText : "";
+		beforeCell.appendChild(beforeText);
 
 		const afterTr = document.createElement("tr");
 		afterTr.className = collapsible
@@ -758,7 +843,10 @@ export class DiffView extends ItemView {
 		afterNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
 		const afterCell = document.createElement("td");
 		afterCell.className = "gitee-sync-plus-diff-cell";
-		afterCell.textContent = row.newLine > 0 ? row.newText : "";
+		const afterText = document.createElement("span");
+		afterText.className = "gitee-sync-plus-diff-cell-text";
+		afterText.textContent = row.newLine > 0 ? row.newText : "";
+		afterCell.appendChild(afterText);
 
 		beforeTr.append(beforeNum, beforeCell);
 		afterTr.append(afterNum, afterCell);
