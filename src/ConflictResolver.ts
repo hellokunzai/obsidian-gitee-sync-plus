@@ -132,7 +132,7 @@ export class ConflictResolverModal extends Modal {
 			icon = "\u2713"; /* ✓ */
 			key = "remote";
 		} else if (res?.action === "merge") {
-			icon = "\u25C6"; /* ◆ */
+			icon = "\u25CF"; /* ● */
 			key = "merge";
 		}
 		el.status.setText(icon);
