@@ -961,7 +961,16 @@ export class ConflictDiffModal extends Modal {
 		const remoteNumText = remoteNum.createEl("span", {
 			cls: "gitee-sync-plus-diff-num-text",
 		});
-		remoteNumText.textContent = row.newLine > 0 ? String(row.newLine) : "";
+		// Fall back to the local line number when the row is missing on the
+		// remote side (state "delete"): the cell is empty but the gutter still
+		// shows an anchor so the user can see which local row this "accept
+		// remote" button belongs to.
+		remoteNumText.textContent =
+			row.newLine > 0
+				? String(row.newLine)
+				: row.oldLine > 0
+					? String(row.oldLine)
+					: "";
 		const remoteCell = document.createElement("td");
 		remoteCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		const remoteText = document.createElement("span");
@@ -979,7 +988,14 @@ export class ConflictDiffModal extends Modal {
 		const localNumText = localNum.createEl("span", {
 			cls: "gitee-sync-plus-diff-num-text",
 		});
-		localNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
+		// Mirror fallback: an "insert" row (only on the remote side) still
+		// shows the remote line number on the local gutter as an anchor.
+		localNumText.textContent =
+			row.oldLine > 0
+				? String(row.oldLine)
+				: row.newLine > 0
+					? String(row.newLine)
+					: "";
 		const localCell = document.createElement("td");
 		localCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
 		const localText = document.createElement("span");
