@@ -992,6 +992,16 @@
     max-width: 60px;
     box-sizing: border-box;
 }
+/* ConflictDiffModal side-by-side split: the single 4-column section is now
+   two independent panes (local / remote), each owning its own
+   [num + content] table. Keep the previous 60px gutter width so the line
+   number + checkbox + padding still fit side by side in one column. */
+.gitee-sync-plus-diff-content.layout-side-by-side .gitee-sync-plus-diff-section-table .gitee-sync-plus-diff-num {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    box-sizing: border-box;
+}
 /* Row rolled back via the revert button — dim it to show the change is rejected */
 .gitee-sync-plus-diff-row.is-rolled-back {
     opacity: 0.4;

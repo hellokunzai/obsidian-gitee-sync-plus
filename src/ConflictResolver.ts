@@ -761,49 +761,92 @@ export class ConflictDiffModal extends Modal {
 	private renderSideBySide(): void {
 		const l = messages();
 		const ctx = this.contextLines;
+		// Two independent sections (local on the left, remote on the right) so
+		// the line-number/checkbox gutter visually belongs to its pane instead
+		// of looking like a single shared "center column". Each section has its
+		// own scroller, so horizontal drag-to-scroll only pans the pane the
+		// pointer started on.
 		const wrapper = this.bodyEl.createDiv("gitee-sync-plus-diff-files");
-		const section = wrapper.createDiv(
-			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-wide"
+
+		/* Local pane (left): contains its own line-number + checkbox column. */
+		const localSection = wrapper.createDiv(
+			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-local"
 		);
-		const header = section.createDiv("gitee-sync-plus-diff-section-labels");
-		// Column order follows computeDiffRows(localLines, remoteLines):
-		// oldText (LOCAL) renders on the left, newText (REMOTE) on the right.
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: l.diffLeftLocal });
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: l.diffRightRemote });
-		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
-		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
-		this.attachDragScroll(scrollBox);
+		localSection.createDiv("gitee-sync-plus-diff-section-label").setText(l.diffLeftLocal);
+		const localScroll = localSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const localTable = localScroll.createEl("table", {
+			cls: "gitee-sync-plus-diff-section-table",
+		});
+		this.attachDragScroll(localScroll);
+
+		/* Remote pane (right): contains its own line-number + checkbox column. */
+		const remoteSection = wrapper.createDiv(
+			"gitee-sync-plus-diff-section gitee-sync-plus-diff-section-remote"
+		);
+		remoteSection.createDiv("gitee-sync-plus-diff-section-label").setText(l.diffRightRemote);
+		const remoteScroll = remoteSection.createDiv("gitee-sync-plus-diff-section-scroll");
+		const remoteTable = remoteScroll.createEl("table", {
+			cls: "gitee-sync-plus-diff-section-table",
+		});
+		this.attachDragScroll(remoteScroll);
 
 		for (const seg of this.buildSegments()) {
 			const len = seg.end - seg.start + 1;
 			if (seg.type === "diff" || len <= ctx * 2 || !this.collapseUnchanged) {
-				const tbody = table.createEl("tbody");
+				const localBody = localTable.createEl("tbody");
+				const remoteBody = remoteTable.createEl("tbody");
 				for (let i = seg.start; i <= seg.end; i++) {
-					tbody.appendChild(this.buildSideRow(this.rows[i], false, i));
+					// Reuse the row builder: it emits {remoteEl, localEl} with the
+					// line-number + checkbox already attached on each side.
+					const { remoteEl, localEl } = this.buildVerticalPair(this.rows[i], false, i);
+					localBody.appendChild(localEl);
+					remoteBody.appendChild(remoteEl);
 				}
 				continue;
 			}
-			// Long equal run: collapse the middle behind a placeholder.
-			const tbody = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+			/* Long equal run: collapse the middle behind a placeholder on both panes.
+			   A click on either side expands both, so the rows stay vertically aligned. */
+			const localBody = localTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
+			const remoteBody = remoteTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
 			for (let i = seg.start; i < seg.start + ctx; i++) {
-				tbody.appendChild(this.buildSideRow(this.rows[i], false, i));
+				const { remoteEl, localEl } = this.buildVerticalPair(this.rows[i], false, i);
+				localBody.appendChild(localEl);
+				remoteBody.appendChild(remoteEl);
 			}
 			const hidden = len - ctx * 2;
-			const ph = tbody.createEl("tr", {
+			const localPh = localBody.createEl("tr", {
 				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
 			});
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
-			ph.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
-			const frag = document.createDocumentFragment();
+			localPh.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
+			localPh.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
+
+			const remotePh = remoteBody.createEl("tr", {
+				cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
+			});
+			remotePh.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("\u22EF"); /* ⋯ */
+			remotePh.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hidden));
+
+			const fragLocal = document.createDocumentFragment();
+			const fragRemote = document.createDocumentFragment();
 			for (let i = seg.start + ctx; i <= seg.end - ctx; i++) {
-				frag.appendChild(this.buildSideRow(this.rows[i], true, i));
+				const { remoteEl, localEl } = this.buildVerticalPair(this.rows[i], true, i);
+				fragLocal.appendChild(localEl);
+				fragRemote.appendChild(remoteEl);
 			}
-			ph.after(frag);
-			ph.addEventListener("click", () => tbody.toggleClass("is-expanded", true));
+			localPh.after(fragLocal);
+			remotePh.after(fragRemote);
+
+			const expand = () => {
+				localBody.toggleClass("is-expanded", true);
+				remoteBody.toggleClass("is-expanded", true);
+			};
+			localPh.addEventListener("click", expand);
+			remotePh.addEventListener("click", expand);
+
 			for (let i = seg.end - ctx + 1; i <= seg.end; i++) {
-				tbody.appendChild(this.buildSideRow(this.rows[i], false, i));
+				const { remoteEl, localEl } = this.buildVerticalPair(this.rows[i], false, i);
+				localBody.appendChild(localEl);
+				remoteBody.appendChild(remoteEl);
 			}
 		}
 	}
@@ -985,93 +1028,6 @@ export class ConflictDiffModal extends Modal {
 		}
 
 		return { remoteEl: remoteTr, localEl: localTr };
-	}
-
-	private buildSideRow(row: DiffRow, collapsible: boolean, rowIndex: number): HTMLTableRowElement {
-		const l = messages();
-		const tr = document.createElement("tr");
-		tr.className =
-			(collapsible ? "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible " : "gitee-sync-plus-diff-row ") +
-			`state-${row.state}`;
-
-		const leftNum = document.createElement("td");
-		leftNum.className = "gitee-sync-plus-diff-num";
-		const leftNumText = leftNum.createEl("span", {
-			cls: "gitee-sync-plus-diff-num-text",
-		});
-		leftNumText.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
-		const leftCell = document.createElement("td");
-		leftCell.className = "gitee-sync-plus-diff-cell" + (row.oldLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		const leftText = document.createElement("span");
-		leftText.className = "gitee-sync-plus-diff-cell-text";
-		leftText.textContent = row.oldText;
-		leftCell.appendChild(leftText);
-		const rightNum = document.createElement("td");
-		rightNum.className = "gitee-sync-plus-diff-num";
-		const rightNumText = rightNum.createEl("span", {
-			cls: "gitee-sync-plus-diff-num-text",
-		});
-		// When the remote side has no line (e.g. remote-only delete), fall back
-		// to the matching local line number as an anchor so the user can still
-		// see which local row this "accept remote" button corresponds to.
-		rightNumText.textContent =
-			row.newLine > 0
-				? String(row.newLine)
-				: row.oldLine > 0
-					? String(row.oldLine)
-					: "";
-		const rightCell = document.createElement("td");
-		rightCell.className = "gitee-sync-plus-diff-cell" + (row.newLine === 0 ? " gitee-sync-plus-diff-empty" : "");
-		const rightText = document.createElement("span");
-		rightText.className = "gitee-sync-plus-diff-cell-text";
-		rightText.textContent = row.newText;
-		rightCell.appendChild(rightText);
-		tr.append(leftNum, leftCell, rightNum, rightCell);
-
-		// Inline per-row accept buttons, one on each side, placed inside the
-		// num cell so the 4-column side-by-side layout is preserved. Local side
-		// = left (oldText); remote side = right (newText).
-		if (row.state !== "equal") {
-			const choice = this.lineChoices.get(rowIndex);
-			tr.addClass("has-choice");
-
-			const acceptLocal = leftNum.createEl("input", {
-				type: "checkbox",
-				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-local",
-				title: l.diffAcceptLocal,
-			});
-			acceptLocal.checked = choice === "local";
-			acceptLocal.addEventListener("change", (evt) => {
-				evt.stopPropagation();
-				this.onCheckboxChange(rowIndex, "local", acceptLocal.checked);
-			});
-
-			const acceptRemote = rightNum.createEl("input", {
-				type: "checkbox",
-				cls: "gitee-sync-plus-diff-accept-checkbox gitee-sync-plus-diff-accept-remote",
-				title: l.diffAcceptRemote,
-			});
-			acceptRemote.checked = choice === "remote";
-			acceptRemote.addEventListener("change", (evt) => {
-				evt.stopPropagation();
-				this.onCheckboxChange(rowIndex, "remote", acceptRemote.checked);
-			});
-
-			// Accepted side is highlighted, the rejected side is dimmed.
-			if (choice === "local") {
-				leftNum.addClass("is-accepted");
-				leftCell.addClass("is-accepted");
-				rightNum.addClass("is-rejected");
-				rightCell.addClass("is-rejected");
-			} else if (choice === "remote") {
-				rightNum.addClass("is-accepted");
-				rightCell.addClass("is-accepted");
-				leftNum.addClass("is-rejected");
-				leftCell.addClass("is-rejected");
-			}
-		}
-
-		return tr;
 	}
 
 	/**
