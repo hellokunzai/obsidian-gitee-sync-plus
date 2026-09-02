@@ -734,9 +734,7 @@ export class ConflictDiffModal extends Modal {
 		const unresolved = this.conflictRowCount() - this.pickedRowCount();
 		const parts = [l.conflictDiffStats(del, ins)];
 		if (unresolved > 0) parts.push(l.conflictDiffRemaining(unresolved));
-		const picked = this.lineChoices.size;
-		if (picked > 0) parts.push(l.diffAcceptedHint(picked));
-		this.statEl.setText(parts.join(" · "));
+		this.statEl.setText(parts.join("，"));
 	}
 
 	private buildSegments(): Array<{ type: "equal" | "diff"; start: number; end: number }> {
