@@ -314,33 +314,22 @@
 	color: var(--text-muted);
 	background: var(--background-secondary);
 	border-bottom: 1px solid var(--background-modifier-border);
-}
-.gitee-sync-plus-diff-section-labels {
-	display: flex;
-	flex: 0 0 auto;
-	padding: 4px 8px;
-	font-size: 0.78em;
-	font-weight: 600;
-	color: var(--text-muted);
-	background: var(--background-secondary);
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-.gitee-sync-plus-diff-section-label-left,
-.gitee-sync-plus-diff-section-label-right {
-	flex: 1 1 50%;
-	padding: 0 6px;
-}
-.gitee-sync-plus-diff-section-wide {
-	width: 100%;
-	border-left: none !important;
-}
-.gitee-sync-plus-diff-section-wide .gitee-sync-plus-diff-section-scroll {
-	width: 100%;
+	/* The version label (本地版本 / 远端版本) must always be fully visible
+	   above its own pane — never clipped by pane overflow. */
+	white-space: nowrap;
+	overflow: visible;
 }
 .gitee-sync-plus-diff-section-scroll {
 	flex: 1;
-	overflow: auto;
 	min-height: 0;
+	/* Horizontal scroll stays always-on so long lines that overflow the pane
+	   can always be revealed (instead of being silently clipped). Vertical
+	   scroll only appears when there's actual overflow. */
+	overflow-x: scroll;
+	overflow-y: auto;
+	/* Reserve space for the horizontal scrollbar so the table layout doesn't
+	   jump when the scrollbar appears / disappears. */
+	scrollbar-gutter: stable;
 	/* Drag-to-scroll affordance: hint that the pane can be panned. */
 	cursor: grab;
 }
@@ -354,6 +343,34 @@
 .gitee-sync-plus-diff-section-scroll.is-dragging button {
 	pointer-events: none;
 }
+/* Make the horizontal scrollbar visibly interactive — without an obvious
+   handle, users don't know that long lines are horizontally scrollable.
+   The vertical track is untouched so it remains unobtrusive when there's
+   no vertical overflow. */
+.gitee-sync-plus-diff-section-scroll::-webkit-scrollbar {
+	height: 12px;
+	width: 10px;
+}
+.gitee-sync-plus-diff-section-scroll::-webkit-scrollbar-track {
+	background: var(--background-secondary);
+	border-radius: 6px;
+}
+.gitee-sync-plus-diff-section-scroll::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border-hover);
+	border-radius: 6px;
+	border: 2px solid var(--background-secondary);
+}
+.gitee-sync-plus-diff-section-scroll::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+	border-color: var(--background-secondary);
+}
+.gitee-sync-plus-diff-section-scroll::-webkit-scrollbar-thumb:active {
+	background: var(--text-accent);
+}
+.gitee-sync-plus-diff-section-scroll {
+	scrollbar-color: var(--background-modifier-border-hover) var(--background-secondary);
+	scrollbar-width: thin;
+}
 .gitee-sync-plus-diff-section-table {
 	width: max-content;
 	min-width: 100%;
@@ -366,27 +383,9 @@
 .gitee-sync-plus-diff-section-table td {
 	vertical-align: top;
 }
-.gitee-sync-plus-diff-table {
-	width: max-content;
-	min-width: 100%;
-	border-collapse: collapse;
-	font-family: var(--font-monospace);
-	font-size: 0.82em;
-	line-height: 1.45;
-	table-layout: auto;
-}
-.gitee-sync-plus-diff-table td {
-	vertical-align: top;
-}
-.gitee-sync-plus-diff-table .gitee-sync-plus-diff-num {
-	width: 36px;
-	min-width: 36px;
-	max-width: 36px;
-}
-.gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell {
-    width: auto;
-}
-.gitee-sync-plus-diff-table .gitee-sync-plus-diff-cell.gitee-sync-plus-diff-empty {
+/* Hatched placeholder for the side that has no content on this row
+   (deleted/added line). Applies to both diff panes. */
+.gitee-sync-plus-diff-cell.gitee-sync-plus-diff-empty {
 	background: repeating-linear-gradient(
 		45deg,
 		var(--background-primary),
@@ -507,9 +506,6 @@
 }
 
 /* Sync-scroll indicator for section scrollers (subtle active border) */
-.gitee-sync-plus-diff-section-scroll {
-	scrollbar-gutter: stable;
-}
 .gitee-sync-plus-diff-content.sync-scroll-active .gitee-sync-plus-diff-section-scroll {
 	border-color: var(--text-accent);
 }
@@ -1006,20 +1002,9 @@
    for the absolute-positioned revert button (.gitee-sync-plus-diff-revert-btn)
    so the line number text isn't covered.
 
-   - Side-by-side (two-column): two num columns live next to two equal-width
-     cell columns under `table-layout: fixed`. If both num columns were 72px
-     each (= 144px combined), cell columns would be squeezed out of the
-     visible area. 60px per side keeps the four-column layout balanced. */
-.gitee-sync-plus-diff-section-wide .gitee-sync-plus-diff-num {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
-    box-sizing: border-box;
-}
-/* ConflictDiffModal side-by-side split: the single 4-column section is now
-   two independent panes (local / remote), each owning its own
-   [num + content] table. Keep the previous 60px gutter width so the line
-   number + checkbox + padding still fit side by side in one column. */
+   - Side-by-side (two independent panes, each with its own
+     [num + content] table): 60px per pane gutter keeps the line number +
+     revert button + padding fitting side by side in one column. */
 .gitee-sync-plus-diff-content.layout-side-by-side .gitee-sync-plus-diff-section-table .gitee-sync-plus-diff-num {
     width: 60px;
     min-width: 60px;

@@ -457,11 +457,12 @@ export class DiffView extends ItemView {
 		// Invalidate any in-flight batched render from a previous call.
 		const token = ++this.renderToken;
 
-		if (this.layout === "side-by-side") {
-			await this.renderSideBySide(wrapper, rows, beforeLabel, afterLabel, token);
-		} else {
-			await this.renderVertical(wrapper, rows, beforeLabel, afterLabel, token);
-		}
+		// Both layouts share the same two-pane DOM (independent local/remote
+		// sections, each with its own label + scroll container); the
+		// layout-side-by-side / layout-vertical class only flips the flex
+		// direction. This guarantees each version pane is fully visible and
+		// has its own horizontal scrollbar / drag-to-scroll.
+		await this.renderSplitPanes(wrapper, rows, beforeLabel, afterLabel, token);
 		if (token !== this.renderToken || !this.diffContentEl) return;
 
 		this.diffContentEl.toggleClass("collapse-unchanged", this.collapseUnchanged);
@@ -543,159 +544,22 @@ export class DiffView extends ItemView {
 		}
 	}
 
-	private renderSideBySide(
-		wrapper: HTMLElement,
-		rows: DiffRow[],
-		beforeLabel: string,
-		afterLabel: string,
-		token: number
-	): Promise<void> {
-		const section = wrapper.createDiv("gitee-sync-plus-diff-section gitee-sync-plus-diff-section-wide");
-		const header = section.createDiv("gitee-sync-plus-diff-section-labels");
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-left", text: beforeLabel });
-		header.createSpan({ cls: "gitee-sync-plus-diff-section-label-right", text: afterLabel });
-
-		const scrollBox = section.createDiv("gitee-sync-plus-diff-section-scroll");
-		const table = scrollBox.createEl("table", { cls: "gitee-sync-plus-diff-table" });
-		this.sectionScrollEls.push(scrollBox);
-		this.attachDragScroll(scrollBox);
-
-		const segments = this.buildRowSegments(rows);
-
-		// Small files: render synchronously (fast path, no frame splitting).
-		if (rows.length <= BATCH_THRESHOLD) {
-			for (const seg of segments) {
-				if (token !== this.renderToken) return Promise.resolve();
-				this.renderSideBySideSegment(table, seg, rows);
-			}
-			return Promise.resolve();
-		}
-
-		// Large files: render segment-by-segment, yielding to the event loop
-		// between segments so the UI stays responsive. Long equal runs only
-		// render their context + a placeholder (hidden middle lines are
-		// lazy-loaded on expand), keeping the DOM tiny regardless of file size.
-		return this.renderSegmentsBatched(
-			token,
-			segments,
-			(seg) => this.renderSideBySideSegment(table, seg, rows)
-		);
-	}
-
-	private renderSideBySideSegment(
-		table: HTMLElement,
-		seg: { type: "equal" | "diff"; start: number; end: number },
-		rows: DiffRow[]
-	): void {
-		const l = messages();
-		const CONTEXT_LINES = 2;
-		const len = seg.end - seg.start + 1;
-
-		if (seg.type === "diff" || len <= CONTEXT_LINES * 2) {
-			const tbody = table.createEl("tbody");
-			for (let i = seg.start; i <= seg.end; i++) {
-				this.renderSideBySideRow(tbody, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
-			}
-			return;
-		}
-
-		const group = table.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
-		for (let i = seg.start; i < seg.start + CONTEXT_LINES; i++) {
-			this.renderSideBySideRow(group, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
-		}
-
-		const hiddenCount = len - CONTEXT_LINES * 2;
-		const placeholder = group.createEl("tr", {
-			cls: "gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsed-placeholder",
-		});
-		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
-		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" });
-		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-num" }).setText("⋯");
-		placeholder.createEl("td", { cls: "gitee-sync-plus-diff-cell" }).setText(l.diffUnchangedLines(hiddenCount));
-		// Lazy-load the hidden middle lines only on first expand. A 10k-line
-		// unchanged block then costs ~5 DOM rows instead of ~10k.
-		placeholder.addEventListener("click", () => {
-			if (!group.hasAttribute("data-expanded")) {
-				group.setAttribute("data-expanded", "1");
-				const frag = document.createDocumentFragment();
-				for (let i = seg.start + CONTEXT_LINES; i <= seg.end - CONTEXT_LINES; i++) {
-					frag.appendChild(
-						this.buildSideBySideRow(rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined, true)
-					);
-				}
-				placeholder.after(frag);
-			}
-			group.toggleClass("is-expanded", true);
-		});
-
-		for (let i = seg.end - CONTEXT_LINES + 1; i <= seg.end; i++) {
-			this.renderSideBySideRow(group, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
-		}
-	}
-
-	private renderSideBySideRow(
-		parent: HTMLElement,
-		row: DiffRow,
-		chunkIndex: number | undefined,
-		collapsible = false
-	): void {
-		parent.appendChild(this.buildSideBySideRow(row, chunkIndex, collapsible));
-	}
-
-	/** Builds a side-by-side diff row element. Uses the native DOM API (not
-	 * Obsidian's createEl) so the same helper can append into a tbody or a
-	 * DocumentFragment when lazy-loading collapsed unchanged runs. */
-	private buildSideBySideRow(row: DiffRow, chunkIndex: number | undefined, collapsible: boolean): HTMLTableRowElement {
-		const l = messages();
-		const tr = document.createElement("tr");
-		tr.className = collapsible
-			? `gitee-sync-plus-diff-row gitee-sync-plus-diff-collapsible state-${row.state}`
-			: `gitee-sync-plus-diff-row state-${row.state}`;
-
-		const leftNum = document.createElement("td");
-		leftNum.className = "gitee-sync-plus-diff-num";
-		leftNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
-
-		const leftCell = document.createElement("td");
-		leftCell.className = `gitee-sync-plus-diff-cell ${row.oldLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
-		const leftText = document.createElement("span");
-		leftText.className = "gitee-sync-plus-diff-cell-text";
-		leftText.textContent = row.oldText;
-		leftCell.appendChild(leftText);
-
-		const rightNum = document.createElement("td");
-		rightNum.className = "gitee-sync-plus-diff-num";
-		rightNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
-
-		const rightCell = document.createElement("td");
-		rightCell.className = `gitee-sync-plus-diff-cell ${row.newLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
-		const rightText = document.createElement("span");
-		rightText.className = "gitee-sync-plus-diff-cell-text";
-		rightText.textContent = row.newText;
-		rightCell.appendChild(rightText);
-
-		tr.append(leftNum, leftCell, rightNum, rightCell);
-
-		if (chunkIndex !== undefined) {
-			const attach = (numCell: HTMLElement) => {
-				const revertBtn = document.createElement("button");
-				revertBtn.textContent = "↩";
-				revertBtn.title = l.diffRevertChunk;
-				revertBtn.className = "gitee-sync-plus-diff-revert-btn";
-				revertBtn.addEventListener("click", (evt) => {
-					evt.stopPropagation();
-					void this.onRevertChunk(chunkIndex);
-				});
-				numCell.appendChild(revertBtn);
-			};
-			if (this.localSide === "before" && row.oldLine > 0) attach(leftNum);
-			if (this.localSide === "after" && row.newLine > 0) attach(rightNum);
-		}
-
-		return tr;
-	}
-
-	private renderVertical(
+	/**
+	 * Renders the diff as two independent panes — one for the "before"
+	 * version, one for the "after" version. Each pane owns its own label,
+	 * scroll container and [num + content] table, so:
+	 *  - both version labels are always fully visible (never squeezed by
+	 *    an over-wide shared table);
+	 *  - each pane gets its own horizontal scrollbar and drag-to-scroll,
+	 *    so long lines can be revealed per version (see reference:
+	 *    ConflictDiffModal uses the same structure);
+	 *  - vertical scrolling stays ratio-synced via attachScrollSync().
+	 *
+	 * Side-by-side vs vertical is purely a CSS flex-direction switch on
+	 * .gitee-sync-plus-diff-files, driven by the layout-* class set in
+	 * renderDiff().
+	 */
+	private renderSplitPanes(
 		wrapper: HTMLElement,
 		rows: DiffRow[],
 		beforeLabel: string,
@@ -720,18 +584,18 @@ export class DiffView extends ItemView {
 		if (rows.length <= BATCH_THRESHOLD) {
 			for (const seg of segments) {
 				if (token !== this.renderToken) return Promise.resolve();
-				this.renderVerticalSegment(beforeTable, afterTable, seg, rows);
+				this.renderSplitSegment(beforeTable, afterTable, seg, rows);
 			}
 			return Promise.resolve();
 		}
 		return this.renderSegmentsBatched(
 			token,
 			segments,
-			(seg) => this.renderVerticalSegment(beforeTable, afterTable, seg, rows)
+			(seg) => this.renderSplitSegment(beforeTable, afterTable, seg, rows)
 		);
 	}
 
-	private renderVerticalSegment(
+	private renderSplitSegment(
 		beforeTable: HTMLElement,
 		afterTable: HTMLElement,
 		seg: { type: "equal" | "diff"; start: number; end: number },
@@ -745,7 +609,7 @@ export class DiffView extends ItemView {
 			const beforeBody = beforeTable.createEl("tbody");
 			const afterBody = afterTable.createEl("tbody");
 			for (let i = seg.start; i <= seg.end; i++) {
-				this.renderVerticalRows(beforeBody, afterBody, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+				this.renderSplitRows(beforeBody, afterBody, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
 			}
 			return;
 		}
@@ -754,7 +618,7 @@ export class DiffView extends ItemView {
 		const afterGroup = afterTable.createEl("tbody", { cls: "gitee-sync-plus-diff-collapsed-body" });
 
 		for (let i = seg.start; i < seg.start + CONTEXT_LINES; i++) {
-			this.renderVerticalRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+			this.renderSplitRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
 		}
 
 		const hiddenCount = len - CONTEXT_LINES * 2;
@@ -778,7 +642,7 @@ export class DiffView extends ItemView {
 				const beforeFrag = document.createDocumentFragment();
 				const afterFrag = document.createDocumentFragment();
 				for (let i = seg.start + CONTEXT_LINES; i <= seg.end - CONTEXT_LINES; i++) {
-					const { before, after } = this.buildVerticalRows(
+					const { before, after } = this.buildSplitRows(
 						rows[i],
 						rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined,
 						true
@@ -796,25 +660,27 @@ export class DiffView extends ItemView {
 		afterPlaceholder.addEventListener("click", expand);
 
 		for (let i = seg.end - CONTEXT_LINES + 1; i <= seg.end; i++) {
-			this.renderVerticalRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
+			this.renderSplitRows(beforeGroup, afterGroup, rows[i], rows[i].chunkIndex >= 0 ? rows[i].chunkIndex : undefined);
 		}
 	}
 
-	private renderVerticalRows(
+	private renderSplitRows(
 		beforeBody: HTMLElement,
 		afterBody: HTMLElement,
 		row: DiffRow,
 		chunkIndex: number | undefined,
 		collapsible = false
 	): void {
-		const { before, after } = this.buildVerticalRows(row, chunkIndex, collapsible);
+		const { before, after } = this.buildSplitRows(row, chunkIndex, collapsible);
 		beforeBody.appendChild(before);
 		afterBody.appendChild(after);
 	}
 
-	/** Builds the before/after row pair for vertical layout. Native DOM so the
-	 * rows can be appended into a tbody or a DocumentFragment (lazy expand). */
-	private buildVerticalRows(
+	/** Builds the before/after row pair (one row per pane table). Native DOM
+	 * so the rows can be appended into a tbody or a DocumentFragment (lazy
+	 * expand). Both panes render one single-line row per DiffRow, so the two
+	 * tables stay vertically aligned. */
+	private buildSplitRows(
 		row: DiffRow,
 		chunkIndex: number | undefined,
 		collapsible: boolean
@@ -828,7 +694,7 @@ export class DiffView extends ItemView {
 		beforeNum.className = "gitee-sync-plus-diff-num";
 		beforeNum.textContent = row.oldLine > 0 ? String(row.oldLine) : "";
 		const beforeCell = document.createElement("td");
-		beforeCell.className = "gitee-sync-plus-diff-cell";
+		beforeCell.className = `gitee-sync-plus-diff-cell ${row.oldLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
 		const beforeText = document.createElement("span");
 		beforeText.className = "gitee-sync-plus-diff-cell-text";
 		beforeText.textContent = row.oldLine > 0 ? row.oldText : "";
@@ -842,7 +708,7 @@ export class DiffView extends ItemView {
 		afterNum.className = "gitee-sync-plus-diff-num";
 		afterNum.textContent = row.newLine > 0 ? String(row.newLine) : "";
 		const afterCell = document.createElement("td");
-		afterCell.className = "gitee-sync-plus-diff-cell";
+		afterCell.className = `gitee-sync-plus-diff-cell ${row.newLine === 0 ? "gitee-sync-plus-diff-empty" : ""}`;
 		const afterText = document.createElement("span");
 		afterText.className = "gitee-sync-plus-diff-cell-text";
 		afterText.textContent = row.newLine > 0 ? row.newText : "";
