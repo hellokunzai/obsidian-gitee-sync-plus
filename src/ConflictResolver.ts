@@ -486,11 +486,8 @@ export class ConflictDiffModal extends Modal {
 		const { contentEl, modalEl } = this;
 		contentEl.empty();
 		contentEl.addClass("gitee-sync-plus-conflict-diff-modal");
-		// Make the modal fill the viewport so the diff body can scroll.
-		modalEl.style.width = "min(1100px, 94vw)";
-		contentEl.style.height = "82vh";
-		contentEl.style.display = "flex";
-		contentEl.style.flexDirection = "column";
+		// Sizing is defined in styles.css (gitee-sync-plus-conflict-diff-frame).
+		modalEl.addClass("gitee-sync-plus-conflict-diff-frame");
 
 		const header = contentEl.createDiv("gitee-sync-plus-conflict-diff-header");
 		header.createSpan({
@@ -553,17 +550,20 @@ export class ConflictDiffModal extends Modal {
 	}
 
 	private updateLayoutButton(): void {
-		this.layoutBtn.innerHTML =
+		this.layoutBtn.setText(
 			this.layout === "side-by-side"
 				? "\u21C5" /* ⇅ */
-				: "\u21C4" /* ⇄ */;
+				: "\u21C4" /* ⇄ */
+		);
 	}
 
 	private updateCollapseButton(): void {
 		// Match the tab view (DiffView.ts): use ≣ / ≡ instead of ▼ / ▶.
-		this.collapseBtn.innerHTML = this.collapseUnchanged
-			? "\u2263" /* ≣ */
-			: "\u2261" /* ≡ */;
+		this.collapseBtn.setText(
+			this.collapseUnchanged
+				? "\u2263" /* ≣ */
+				: "\u2261" /* ≡ */
+		);
 		this.collapseBtn.toggleClass("is-active", this.collapseUnchanged);
 	}
 

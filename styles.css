@@ -887,10 +887,14 @@
 }
 
 /* ===== In-modal conflict diff viewer ===== */
+.gitee-sync-plus-conflict-diff-frame {
+	width: min(1100px, 94vw);
+}
 .gitee-sync-plus-conflict-diff-modal {
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
+	height: 82vh;
 }
 .gitee-sync-plus-conflict-diff-header {
 	display: flex;
