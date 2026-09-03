@@ -84,7 +84,7 @@ const en = {
 	optionMergeMtime: "Latest change time",
 	optionMergeRemote: "All remote",
 	optionMergeLocal: "All local",
-	settingsShowSyncRibbon: "Show sync button in sidebar ribbon",
+	settingsShowSyncRibbon: "Sync button",
 	settingsShowSyncRibbonDesc: "When enabled, a sync button appears in the left sidebar ribbon for quick access.",
 	settingsShowPanelRibbon: "Show Git panel button in sidebar ribbon",
 	settingsShowPanelRibbonDesc: "When enabled, a Git panel button appears in the left sidebar ribbon.",
@@ -111,7 +111,7 @@ const en = {
 	tokenSaveFailed: (message: string) => `Failed to save token: ${message}`,
 
 	sectionRepo: "Repository settings",
-	sectionAutoSync: "Auto sync",
+	sectionAutoSync: "Sync settings",
 	sectionAdvanced: "Advanced",
 
 	previewTitle: "Sync preview (not executed)",
@@ -361,7 +361,7 @@ const zh: typeof en = {
 	optionMergeMtime: "最新更改时间",
 	optionMergeRemote: "全部使用远端",
 	optionMergeLocal: "全部使用本地",
-	settingsShowSyncRibbon: "在侧边栏显示同步按钮",
+	settingsShowSyncRibbon: "同步按钮",
 	settingsShowSyncRibbonDesc: "开启后，左侧边栏将显示同步按钮，方便快速触发同步。",
 	settingsShowPanelRibbon: "在侧边栏显示 Git 面板按钮",
 	settingsShowPanelRibbonDesc: "开启后，左侧边栏将显示 Git 面板按钮，可快速打开 Git 面板。",
@@ -388,7 +388,7 @@ const zh: typeof en = {
 	tokenSaveFailed: (message) => `保存令牌失败：${message}`,
 
 	sectionRepo: "仓库设置",
-	sectionAutoSync: "自动同步",
+	sectionAutoSync: "同步设置",
 	sectionAdvanced: "高级设置",
 
 	previewTitle: "同步预演（未执行）",

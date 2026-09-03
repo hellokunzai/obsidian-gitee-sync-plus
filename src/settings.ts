@@ -207,6 +207,9 @@ export class SyncSettingTab extends PluginSettingTab {
 			);
 		}
 
+		// ── 同步设置 ──────────────────────────────────────
+		this.createSectionHeader(containerEl, l.sectionAutoSync);
+
 		new Setting(containerEl)
 			.setName(l.settingsShowSyncRibbon)
 			.setDesc(l.settingsShowSyncRibbonDesc)
@@ -217,9 +220,6 @@ export class SyncSettingTab extends PluginSettingTab {
 					this.plugin.updateRibbonIcons();
 				})
 			);
-
-		// ── 自动同步 ──────────────────────────────────────
-		this.createSectionHeader(containerEl, l.sectionAutoSync);
 
 		new Setting(containerEl)
 			.setName(l.settingsSyncOnStart)
@@ -232,35 +232,6 @@ export class SyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName(l.settingsCommitMode)
-			.setDesc(l.settingsCommitModeDesc)
-			.addDropdown((d) =>
-				d
-					.addOption("per-file", l.optionPerFile)
-					.addOption("batch", l.optionBatch)
-					.setValue(s.commitMode)
-					.onChange(async (v) => {
-					s.commitMode = v as CommitMode;
-					await save();
-				})
-		);
-
-	new Setting(containerEl)
-		.setName(l.settingsMergeStrategy)
-		.setDesc(l.settingsMergeStrategyDesc)
-		.addDropdown((d) =>
-			d
-				.addOption("mtime", l.optionMergeMtime)
-				.addOption("remote", l.optionMergeRemote)
-				.addOption("local", l.optionMergeLocal)
-				.setValue(s.mergeStrategy)
-				.onChange(async (v) => {
-					s.mergeStrategy = v as MergeStrategy;
-					await save();
-				})
-		);
-
-		new Setting(containerEl)
 			.setName(l.settingsAutoSync)
 			.setDesc(l.settingsAutoSyncDesc)
 			.addText((t) =>
@@ -270,6 +241,35 @@ export class SyncSettingTab extends PluginSettingTab {
 					await save();
 					this.plugin.setupAutoSync();
 				})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsMergeStrategy)
+			.setDesc(l.settingsMergeStrategyDesc)
+			.addDropdown((d) =>
+				d
+					.addOption("mtime", l.optionMergeMtime)
+					.addOption("remote", l.optionMergeRemote)
+					.addOption("local", l.optionMergeLocal)
+					.setValue(s.mergeStrategy)
+					.onChange(async (v) => {
+						s.mergeStrategy = v as MergeStrategy;
+						await save();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName(l.settingsCommitMode)
+			.setDesc(l.settingsCommitModeDesc)
+			.addDropdown((d) =>
+				d
+					.addOption("per-file", l.optionPerFile)
+					.addOption("batch", l.optionBatch)
+					.setValue(s.commitMode)
+					.onChange(async (v) => {
+						s.commitMode = v as CommitMode;
+						await save();
+					})
 			);
 
 		// ── 高级设置 ──────────────────────────────────────
