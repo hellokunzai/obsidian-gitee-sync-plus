@@ -6,3 +6,22 @@ main.js
 
 # os
 .DS_Store
+
+# ---------------------------------------------------------------------------
+# Dev / AI-agent artifacts (not part of the published plugin)
+# These were accidentally tracked during development. From now on they are
+# ignored so they never re-enter the repository. To clean the already-tracked
+# copies, run on the next commit:
+#   git rm -r --cached .workbuddy outputs .claude AGENTS.md overview.md CHANGELOG.md scripts
+# ---------------------------------------------------------------------------
+.workbuddy/
+.claude/
+outputs/
+
+# stray dev docs
+AGENTS.md
+overview.md
+CHANGELOG.md
+
+# dev helper scripts (release.sh etc.)
+scripts/
