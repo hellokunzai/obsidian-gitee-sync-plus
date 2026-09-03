@@ -234,14 +234,20 @@ export class SyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(l.settingsAutoSync)
 			.setDesc(l.settingsAutoSyncDesc)
-			.addText((t) =>
-				t.setValue(String(s.autoSyncMinutes)).onChange(async (v) => {
-					const n = Number(v);
-					s.autoSyncMinutes = Number.isFinite(n) && n > 0 ? n : 0;
-					await save();
-					this.plugin.setupAutoSync();
-				})
-			);
+			.addText((t) => {
+				t.setValue(String(s.autoSyncMinutes))
+					.onChange(async (v) => {
+						const n = Number(v);
+						s.autoSyncMinutes = Number.isFinite(n) && n > 0 ? n : 0;
+						await save();
+						this.plugin.setupAutoSync();
+					});
+				// Restrict input to non-negative integers (minutes).
+				t.inputEl.type = "number";
+				t.inputEl.min = "0";
+				t.inputEl.step = "1";
+				t.inputEl.inputMode = "numeric";
+			});
 
 		new Setting(containerEl)
 			.setName(l.settingsMergeStrategy)
