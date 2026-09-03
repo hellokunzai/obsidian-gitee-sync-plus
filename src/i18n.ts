@@ -353,8 +353,8 @@ const zh: typeof en = {
 		"把每次同步的完整计划和结果记录到 vault 根目录的 _gitee-sync-plus-log.md（建议通过 .gitignore 排除同步）。",
 	settingsCommitMode: "提交模式",
 	settingsCommitModeDesc: "选择每个文件单独提交一次，还是将所有变更合并为一次提交。",
-	optionPerFile: "每个文件单独提交",
-	optionBatch: "合并为一次提交（批量）",
+	optionPerFile: "文件单独提交",
+	optionBatch: "文件批量提交",
 	settingsMergeStrategy: "合并方式",
 	settingsMergeStrategyDesc:
 		"同步时（侧边栏按钮、启动时或定时同步）两端都修改了同一文件时的冲突解决方式。",
