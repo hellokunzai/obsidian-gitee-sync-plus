@@ -83,7 +83,7 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	commitMode: "per-file",
 	mergeStrategy: "mtime",
 	showSyncRibbon: true,
-	showPanelRibbon: true,
+	showPanelRibbon: false,
 };
 
 export class SyncSettingTab extends PluginSettingTab {
