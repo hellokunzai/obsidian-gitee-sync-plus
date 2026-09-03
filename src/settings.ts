@@ -37,6 +37,7 @@ function clearBranchCache(host: string, owner: string, repo: string): void {
 
 export type BackendType = "gitee" | "github";
 export type CommitMode = "per-file" | "batch";
+export type MergeStrategy = "mtime" | "remote" | "local";
 
 export interface SyncSettings {
 	backend: BackendType;
@@ -59,6 +60,7 @@ export interface SyncSettings {
 	excludeFolders?: string;
 	debugLog: boolean;
 	commitMode: CommitMode;
+	mergeStrategy: MergeStrategy;
 	showSyncRibbon: boolean;
 	showPanelRibbon: boolean;
 }
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	syncOnStart: false,
 	debugLog: false,
 	commitMode: "per-file",
+	mergeStrategy: "mtime",
 	showSyncRibbon: true,
 	showPanelRibbon: true,
 };
@@ -237,10 +240,25 @@ export class SyncSettingTab extends PluginSettingTab {
 					.addOption("batch", l.optionBatch)
 					.setValue(s.commitMode)
 					.onChange(async (v) => {
-						s.commitMode = v as CommitMode;
-						await save();
-					})
-			);
+					s.commitMode = v as CommitMode;
+					await save();
+				})
+		);
+
+	new Setting(containerEl)
+		.setName(l.settingsMergeStrategy)
+		.setDesc(l.settingsMergeStrategyDesc)
+		.addDropdown((d) =>
+			d
+				.addOption("mtime", l.optionMergeMtime)
+				.addOption("remote", l.optionMergeRemote)
+				.addOption("local", l.optionMergeLocal)
+				.setValue(s.mergeStrategy)
+				.onChange(async (v) => {
+					s.mergeStrategy = v as MergeStrategy;
+					await save();
+				})
+		);
 
 		new Setting(containerEl)
 			.setName(l.settingsAutoSync)

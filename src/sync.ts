@@ -45,9 +45,9 @@ export interface SyncPlan {
 	unchanged: number;
 	conflicts: number;
 	pulls: { path: string; rem: RemoteEntry; reason: string; isConflict?: boolean }[];
-	localDeletes: { path: string; loc: LocalEntry; reason: string }[];
+	localDeletes: { path: string; loc: LocalEntry; reason: string; isConflict?: boolean }[];
 	pushes: { path: string; loc: LocalEntry; rem?: RemoteEntry; reason: string; isConflict?: boolean }[];
-	remoteDeletes: { path: string; rem: RemoteEntry; reason: string }[];
+	remoteDeletes: { path: string; rem: RemoteEntry; reason: string; isConflict?: boolean }[];
 	/** Files changed on both sides since the last sync, surfaced for manual resolution. */
 	conflictEntries: ConflictEntry[];
 	/** Baseline entries for paths already identical on both sides. */
@@ -343,7 +343,8 @@ export class SyncEngine {
 				summary.pulled++;
 			});
 		}
-		for (const { path, loc } of plan.localDeletes) {
+		for (const { path, loc, isConflict } of plan.localDeletes) {
+			if (conflictMode && isConflict) continue;
 			await step(path, async () => {
 				await this.vault.adapter.remove(loc.path);
 				delete this.plugin.hashCache[path];
@@ -593,15 +594,34 @@ export class SyncEngine {
 					});
 				else if (loc) plan.localDeletes.push({ path, loc, reason: l.reasonRemoteDeleted });
 		} else {
-			// Both sides changed since the last sync: newer mtime wins;
-			// a modification beats a deletion. These are surfaced to the user
-			// as conflicts instead of being silently overwritten.
+			// Both sides changed since the last sync. These are surfaced to the
+			// user as conflicts instead of being silently overwritten. The
+			// configured merge strategy picks the automatic winner:
+			// "mtime" compares modification times (newer wins), "remote"
+			// always pulls the remote version, "local" always keeps the
+			// local version. A modification beats a deletion under "mtime".
 			plan.conflicts++;
+			const strategy = this.plugin.settings.mergeStrategy;
 			let preferred: "local" | "remote" = "remote";
 			let reason: string;
 			if (loc && rem) {
-				// Panel mode avoids expensive per-file commit-time lookups.
-				if (resolveConflictMtime) {
+				if (!resolveConflictMtime) {
+					// In the panel we only need to know the file is conflicting;
+					// the exact winner is resolved when the user runs the pull.
+					preferred = "remote";
+					reason = l.reasonConflictBothChanged;
+					plan.pushes.push({ path, loc, rem, reason, isConflict: true });
+				} else if (strategy === "remote") {
+					preferred = "remote";
+					reason = l.reasonConflictUseRemote;
+					plan.pulls.push({ path, rem, reason, isConflict: true });
+				} else if (strategy === "local") {
+					preferred = "local";
+					reason = l.reasonConflictUseLocal;
+					plan.pushes.push({ path, loc, rem, reason, isConflict: true });
+				} else {
+					// "mtime": newer modification time wins. Panel mode avoids
+					// expensive per-file commit-time lookups.
 					const remoteMtime = await this.remoteMtime(backend, path, rem);
 					if (loc.mtime >= remoteMtime) {
 						preferred = "local";
@@ -612,21 +632,29 @@ export class SyncEngine {
 						reason = l.reasonConflictRemoteNewer(ts(remoteMtime), ts(loc.mtime));
 						plan.pulls.push({ path, rem, reason, isConflict: true });
 					}
-				} else {
-					// In the panel we only need to know the file is conflicting;
-					// the exact winner is resolved when the user runs the pull.
-					preferred = "remote";
-					reason = l.reasonConflictBothChanged;
-					plan.pushes.push({ path, loc, rem, reason, isConflict: true });
 				}
 			} else if (loc) {
-				preferred = "local";
-				reason = l.reasonConflictKeepLocal;
-				plan.pushes.push({ path, loc, rem, reason, isConflict: true });
+				// Remote deleted the file but local modified it.
+				if (resolveConflictMtime && strategy === "remote") {
+					preferred = "remote";
+					reason = l.reasonConflictDeleteLocalByRemote;
+					plan.localDeletes.push({ path, loc, reason, isConflict: true });
+				} else {
+					preferred = "local";
+					reason = l.reasonConflictKeepLocal;
+					plan.pushes.push({ path, loc, rem, reason, isConflict: true });
+				}
 			} else if (rem) {
-				preferred = "remote";
-				reason = l.reasonConflictKeepRemote;
-				plan.pulls.push({ path, rem, reason, isConflict: true });
+				// Local deleted the file but remote modified it.
+				if (resolveConflictMtime && strategy === "local") {
+					preferred = "local";
+					reason = l.reasonConflictDeleteRemoteByLocal;
+					plan.remoteDeletes.push({ path, rem, reason, isConflict: true });
+				} else {
+					preferred = "remote";
+					reason = l.reasonConflictKeepRemote;
+					plan.pulls.push({ path, rem, reason, isConflict: true });
+				}
 			} else {
 				// Unreachable: at least one side must exist to reach this branch.
 				continue;

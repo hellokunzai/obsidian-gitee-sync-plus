@@ -1,48 +1,49 @@
-# 变更概览：解决拉取冲突 Modal — 状态点、确认按钮与取消按钮
+# 变更概览：新增「合并方式」设置项（1.2.2 → 1.3.0）
 
 ## 需求
 
-1. 在「解决拉取冲突」列表中，通过文件差异视图点击「应用合并」后，该文件的状态点仍为橙色，与未处理状态无法区分。要求改为绿色表示已处理。
-2. 绿色 `◆` 状态点视觉上比未处理的 `●` 小，要求大小保持一致。
-3. 「确认拉取」按钮在所有冲突解决前需明显禁用——当前在未全部解决时视觉上仍像可点。
-4. 删除 footer 右侧的「取消」按钮，避免误触取消拉取。
+同步时（侧边栏同步按钮 / 启动时同步 / 定时自动同步）支持选择冲突合并策略：
 
-## 根因
+1. **最新更改时间**（`mtime`，默认）— 保持原有逻辑：比较两端修改时间，新者胜
+2. **全部使用远端**（`remote`）— 冲突时一律以远端为准，拉取覆盖本地
+3. **全部使用本地**（`local`）— 冲突时一律以本地为准，推送覆盖远端
 
-1. **颜色（s-merge）**：`ConflictResolver.ts` 的 `updateItem()` 在合并完成后将状态点设为 `◆` + `s-merge` 类，而 `styles.css` 中 `.s-merge` 的颜色为 `var(--text-warning)`（橙色），与未处理的 `.s-pending`（同为橙色）视觉一致。
-2. **大小（◆ vs ●）**：`◆`（U+25C6）字符本身光学尺寸比 `●`（U+25CF）小约 20%，即使 font-size 相同（0.7em）视觉上仍偏小。
-3. **确认按钮禁用**：JS 逻辑已正确（`updateFooter()` 设置 `disabled` 属性与 `is-disabled` 类），但按钮仅带 Obsidian 内置 `mod-cta` 类，没有挂插件自定义 `.gitee-sync-plus-conflict-btn` 类，因此原有的 `.is-disabled`/`disabled` 视觉样式（opacity 0.5、cursor not-allowed）未生效；Obsidian 默认 `.mod-cta` 在 `:disabled` 下也不会变灰。
+设置项位置：设置面板「自动同步」区块，「提交模式」与「自动同步间隔」之间。
+
+## 现状分析
+
+改动前 `src/sync.ts` 的 `buildPlan()` 对「两端都修改同一文件」的冲突只有一套硬编码逻辑：mtime 新者胜，静默执行，用户无法选择。Git 面板的手动冲突解决（ConflictResolver）是独立路径，本次不受影响。
 
 ## 变更内容
 
 | 文件 | 改动 | Build 状态 |
 |------|------|-----------|
-| `styles.css` | `.s-merge` 颜色由 `--text-warning` 改为 `--text-success`（绿），并附注释 | ✅ 通过 |
-| `styles.css` | 新增 `.gitee-sync-plus-conflict-footer .mod-cta:disabled / .is-disabled`：opacity 0.4 + cursor not-allowed + grayscale(1)，并在 hover 强制保留 grayscale，不让悬停看起来可点 | ✅ 通过 |
-| `src/ConflictResolver.ts` | `updateItem()` 中 merge 图标由 `\u25C6`（◆）改为 `\u25CF`（●），与待处理同字符 | ✅ 通过，`main.js` 含新字形 |
-| `src/ConflictResolver.ts` | `renderFooter()` 移除「取消」按钮及其 click 监听（5 行）；`onClose()` 的取消回调保留，X / Escape 关闭仍会正确取消拉取 | ✅ 通过 |
+| `src/settings.ts` | 新增 `MergeStrategy` 类型（`"mtime" \| "remote" \| "local"`）、`mergeStrategy` 字段（默认 `mtime`，向后兼容）、红框位置的 Dropdown 设置项 | ✅ 通过 |
+| `src/sync.ts` | `buildPlan()` 冲突分支按策略分流；`SyncPlan.localDeletes/remoteDeletes` 增加 `isConflict?` 标记；`executePull` 在面板手动拉取模式下跳过带标记的删除项 | ✅ 通过 |
+| `src/i18n.ts` | 新增 5 个设置文案 key + 4 个冲突原因 key，en + zh-cn 同步；选项文案按用户要求改为「最新更改时间 / 全部使用远端 / 全部使用本地」 | ✅ 通过 |
+| `manifest.json` / `package.json` / `versions.json` | 版本 1.2.2 → 1.3.0（Minor，新功能向后兼容） | ✅ 三文件一致 |
 
-## 修改后效果
+## 策略行为明细
 
-### 状态点
+| 冲突场景 | 最新更改时间 | 全部使用远端 | 全部使用本地 |
+|---------|-----------|---------|---------|
+| 两端都修改 | mtime 新者胜 | 拉取远端覆盖本地 | 推送本地覆盖远端 |
+| 远端删除 + 本地修改 | 保留本地（修改胜删除） | 删除本地 | 推送本地 |
+| 本地删除 + 远端修改 | 拉取远端（修改胜删除） | 拉取远端 | 删除远端 |
 
-| 状态点 | 含义 |
-|--------|------|
-| ● 橙色 | 待处理 |
-| ✓ 绿色 | 保留本地 |
-| ✓ 蓝色 | 使用远端 |
-| ● 绿色 | 已合并（与待处理同字符同大小，颜色区分） |
+## 边界设计说明
 
-### 「确认拉取」按钮
+- 策略仅作用于自动同步路径（`SyncEngine.run()`）；Git 面板手动拉取时，冲突仍逐文件人工解决，策略驱动的删除项带 `isConflict` 标记会被跳过，避免重复处理。
+- 面板手动解决弹窗中，冲突项的默认选中侧（`preferred`）会反映当前策略。
 
-- 未全部解决：opacity 0.4 + 灰度滤镜，cursor not-allowed，hover 不变色，**视觉明显不可点**。
-- 全部解决：还原 Obsidian `mod-cta` 强调样式，可正常点击。
+## 验证
 
-### 「取消」按钮
-
-- footer 右侧仅保留「确认拉取」按钮；关闭弹窗请用右上角 X 或 Escape，仍会正确触发取消拉取并重置 busy 状态。
+- `npm run build` 通过（tsc --noEmit + esbuild production）
+- pre-release-check：构建 ✅ / 安全扫描 ✅（3 处 innerHTML 为存量代码）/ 版本一致性 ✅ / manifest 合规 ✅
+- 唯一报错 `src/i18n/index.ts 不存在` 是项目既有的单文件 i18n 结构（`src/i18n.ts`），非本次引入
 
 ## 未执行项
 
-- **未拷贝产物到 vault**：`main.js` 与 `styles.css` 需由你手动拷贝到 vault 的 `.obsidian/plugins/gitee-sync-plus/` 目录后生效。
-- **版本号未升**：UI 微调，未触发 version-bump；如需发版可执行 patch 升版。
+1. **拷贝 `main.js` 到 vault 插件目录** — 由用户自行拷贝（`main.js` / `styles.css` / `manifest.json`）
+2. **Obsidian 内手动验证** — 建议在测试 vault 验证：切换三种策略后制造两端冲突，观察同步方向是否符合上表
+3. **git 提交** — 等待用户明确指令（`git 本地提交`）

@@ -78,6 +78,12 @@ const en = {
 		"Choose whether each file gets its own commit or all changes are combined into a single commit.",
 	optionPerFile: "One commit per file",
 	optionBatch: "One commit for all changes (batch)",
+	settingsMergeStrategy: "Merge strategy",
+	settingsMergeStrategyDesc:
+		"How to resolve conflicts when the same file changed on both sides during sync (sidebar button, startup, or scheduled sync).",
+	optionMergeMtime: "Latest change time",
+	optionMergeRemote: "All remote",
+	optionMergeLocal: "All local",
 	settingsShowSyncRibbon: "Show sync button in sidebar ribbon",
 	settingsShowSyncRibbonDesc: "When enabled, a sync button appears in the left sidebar ribbon for quick access.",
 	settingsShowPanelRibbon: "Show Git panel button in sidebar ribbon",
@@ -137,6 +143,12 @@ const en = {
 	reasonConflictKeepLocal: "Conflict: remote was deleted but local was modified; keep local",
 	reasonConflictKeepRemote: "Conflict: local was deleted but remote was modified; keep remote",
 	reasonConflictBothChanged: "Conflict: both sides changed since last sync",
+	reasonConflictUseRemote: "Conflict: remote wins (merge strategy)",
+	reasonConflictUseLocal: "Conflict: local wins (merge strategy)",
+	reasonConflictDeleteLocalByRemote:
+		"Conflict: remote deleted this file; delete local copy (merge strategy)",
+	reasonConflictDeleteRemoteByLocal:
+		"Conflict: local deleted this file; delete remote copy (merge strategy)",
 	planBackend: (target: string) => `Backend: ${target}`,
 	planCounts: (local: number, remote: number, base: number, unchanged: number, conflicts: number) =>
 		`Local ${local} | Remote ${remote} | **Baseline ${base}** | Unchanged ${unchanged} | Conflicts ${conflicts}`,
@@ -343,6 +355,12 @@ const zh: typeof en = {
 	settingsCommitModeDesc: "选择每个文件单独提交一次，还是将所有变更合并为一次提交。",
 	optionPerFile: "每个文件单独提交",
 	optionBatch: "合并为一次提交（批量）",
+	settingsMergeStrategy: "合并方式",
+	settingsMergeStrategyDesc:
+		"同步时（侧边栏按钮、启动时或定时同步）两端都修改了同一文件时的冲突解决方式。",
+	optionMergeMtime: "最新更改时间",
+	optionMergeRemote: "全部使用远端",
+	optionMergeLocal: "全部使用本地",
 	settingsShowSyncRibbon: "在侧边栏显示同步按钮",
 	settingsShowSyncRibbonDesc: "开启后，左侧边栏将显示同步按钮，方便快速触发同步。",
 	settingsShowPanelRibbon: "在侧边栏显示 Git 面板按钮",
@@ -399,6 +417,10 @@ const zh: typeof en = {
 	reasonConflictKeepLocal: "冲突：远端已删但本地有修改，保留本地",
 	reasonConflictKeepRemote: "冲突：本地已删但远端有修改，保留远端",
 	reasonConflictBothChanged: "冲突：自上次同步以来两端都已修改",
+	reasonConflictUseRemote: "冲突：按合并方式使用远端",
+	reasonConflictUseLocal: "冲突：按合并方式保留本地",
+	reasonConflictDeleteLocalByRemote: "冲突：远端已删除，按合并方式删除本地",
+	reasonConflictDeleteRemoteByLocal: "冲突：本地已删除，按合并方式删除远端",
 	planBackend: (target) => `后端：${target}`,
 	planCounts: (local, remote, base, unchanged, conflicts) =>
 		`本地 ${local} | 远端 ${remote} | **基线 ${base}** | 一致跳过 ${unchanged} | 冲突 ${conflicts}`,
