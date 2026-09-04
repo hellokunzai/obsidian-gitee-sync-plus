@@ -745,7 +745,6 @@
 /* ===== Conflict resolver modal ===== */
 .gitee-sync-plus-conflict-modal {
 	width: auto !important;
-	min-width: 420px;
 	max-width: 90vw !important;
 	display: flex;
 	flex-direction: column;
@@ -807,7 +806,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	flex-shrink: 0;
-	max-width: 140px;
+	max-width: 110px;
 }
 .gitee-sync-plus-conflict-item-path {
 	font-size: 0.8em;
@@ -858,10 +857,6 @@
 	align-items: center;
 	justify-content: flex-end;
 	gap: 8px;
-}
-.gitee-sync-plus-conflict-pending {
-	font-size: 0.8em;
-	color: var(--text-muted);
 }
 .gitee-sync-plus-conflict-btn.is-disabled,
 .gitee-sync-plus-conflict-btn:disabled {

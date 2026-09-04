@@ -159,9 +159,6 @@ export class ConflictResolverModal extends Modal {
 		});
 
 		const right = footer.createDiv("gitee-sync-plus-conflict-footer-right");
-		this.pendingEl = right.createSpan({
-			cls: "gitee-sync-plus-conflict-pending",
-		});
 		this.confirmBtn = right.createEl("button", {
 			text: l.conflictConfirmPull,
 			cls: "mod-cta",
@@ -170,15 +167,11 @@ export class ConflictResolverModal extends Modal {
 		this.updateFooter();
 	}
 
-	private pendingEl!: HTMLElement;
 	private confirmBtn!: HTMLButtonElement;
 
 	private updateFooter(): void {
-		if (!this.pendingEl) return;
-		const l = messages();
 		const done = this.resolutions.size;
 		const total = this.conflicts.length;
-		this.pendingEl.setText(l.conflictPending(done, total));
 		const allResolved = done >= total;
 		this.confirmBtn.disabled = !allResolved;
 		this.confirmBtn.toggleClass("is-disabled", !allResolved);
