@@ -447,8 +447,7 @@ class MergeEditorModal extends Modal {
  */
 export class ConflictDiffModal extends Modal {
 	private bodyEl!: HTMLElement;
-	private statEl!: HTMLElement;
-	private layoutBtn!: HTMLButtonElement;
+		private layoutBtn!: HTMLButtonElement;
 	private collapseBtn!: HTMLButtonElement;
 	private applyMergeBtn!: HTMLButtonElement;
 	private layout: "side-by-side" | "vertical" = "side-by-side";
@@ -484,7 +483,7 @@ export class ConflictDiffModal extends Modal {
 
 		const header = contentEl.createDiv("gitee-sync-plus-conflict-diff-header");
 		header.createSpan({
-			text: `${l.conflictDiffTitle} — ${fileBasename(this.entry.path)}`,
+			text: fileBasename(this.entry.path),
 			cls: "gitee-sync-plus-conflict-diff-title",
 		});
 		const actions = header.createDiv("gitee-sync-plus-conflict-diff-actions");
@@ -511,7 +510,6 @@ export class ConflictDiffModal extends Modal {
 		this.bodyEl.createEl("p", { text: l.diffLoading });
 
 		const footer = contentEl.createDiv("gitee-sync-plus-conflict-diff-footer");
-		this.statEl = footer.createSpan({ cls: "gitee-sync-plus-conflict-diff-stat" });
 		const right = footer.createDiv("gitee-sync-plus-conflict-diff-footer-right");
 		const keepLocal = right.createEl("button", {
 			text: l.conflictUseLocal,
@@ -696,28 +694,7 @@ export class ConflictDiffModal extends Modal {
 		if (this.layout === "side-by-side") this.renderSideBySide();
 		else this.renderVertical();
 
-		this.renderStat();
 		this.updateApplyMergeBtn();
-	}
-
-	private renderStat(): void {
-		const l = messages();
-		let del = 0;
-		let ins = 0;
-		for (const r of this.rows) {
-			if (r.state === "delete") del++;
-			else if (r.state === "insert") ins++;
-			else if (r.state === "change") {
-				del++;
-				ins++;
-			}
-		}
-		// The "N rows unresolved" hint used to live on the "Apply merge"
-		// button; it now reads here so the button keeps a short label.
-		const unresolved = this.conflictRowCount() - this.pickedRowCount();
-		const parts = [l.conflictDiffStats(del, ins)];
-		if (unresolved > 0) parts.push(l.conflictDiffRemaining(unresolved));
-		this.statEl.setText(parts.join("，"));
 	}
 
 	private buildSegments(): Array<{ type: "equal" | "diff"; start: number; end: number }> {

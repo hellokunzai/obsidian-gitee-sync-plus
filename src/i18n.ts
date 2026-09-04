@@ -241,12 +241,10 @@ const en = {
 	statusTagRemote: "↓",
 	statusTagConflict: "⚠",
 
-	conflictDiffTitle: "File diff",
 	conflictDiffLayoutSide: "Side by side",
 	conflictDiffLayoutUnified: "Unified",
 	conflictDiffCollapse: "Collapse unchanged",
 	conflictDiffExpand: "Expand unchanged",
-	conflictDiffStats: (del: number, ins: number) => `${del} line(s) deleted, ${ins} line(s) added`,
 
 	conflictTitle: "Resolve pull conflicts",
 	conflictIntro: (n: number) =>
@@ -254,7 +252,6 @@ const en = {
 	conflictUseLocal: "Keep local",
 	conflictUseRemote: "Use remote",
 	conflictApplyMerge: "Apply merge",
-	conflictDiffRemaining: (n: number) => `${n} line(s) remaining`,
 	conflictMerge: "Merge…",
 	conflictViewDiff: "View diff",
 	conflictResolvedLocal: "Kept local",
@@ -513,20 +510,16 @@ const zh: typeof en = {
 	statusTagRemote: "↓",
 	statusTagConflict: "⚠",
 
-	conflictDiffTitle: "文件差异",
 	conflictDiffLayoutSide: "并排",
 	conflictDiffLayoutUnified: "统一",
 	conflictDiffCollapse: "收起未更改",
 	conflictDiffExpand: "展开未更改",
-	conflictDiffStats: (del: number, ins: number) => `删除 ${del} 行，新增 ${ins} 行`,
 
 	conflictTitle: "解决拉取冲突",
 	conflictIntro: (n) => `自上次同步以来，有 ${n} 个文件在两端都被修改。请逐一解决冲突后再确认拉取。`,
 	conflictUseLocal: "保留本地",
 	conflictUseRemote: "使用远端",
 	conflictApplyMerge: "应用合并",
-	conflictDiffRemaining: (n: number) =>
-		`剩余 ${n} 行未处理`,
 	conflictMerge: "合并…",
 	conflictViewDiff: "查看差异",
 	conflictResolvedLocal: "已保留本地",

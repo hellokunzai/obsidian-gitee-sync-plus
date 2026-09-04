@@ -953,10 +953,6 @@
 	align-items: center;
 	gap: 6px;
 }
-.gitee-sync-plus-conflict-diff-stat {
-	font-size: 0.78em;
-	color: var(--text-muted);
-}
 /* Vertical (top/bottom) diff layout */
 .gitee-sync-plus-diff-files-vertical {
 	flex-direction: column !important;
