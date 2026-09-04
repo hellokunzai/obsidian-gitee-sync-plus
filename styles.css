@@ -948,9 +948,16 @@
 	border-top: 1px solid var(--background-modifier-border);
 	flex: 0 0 auto;
 }
+.gitee-sync-plus-conflict-diff-footer-left {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 6px;
+}
 .gitee-sync-plus-conflict-diff-footer-right {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 6px;
 }
 /* Vertical (top/bottom) diff layout */

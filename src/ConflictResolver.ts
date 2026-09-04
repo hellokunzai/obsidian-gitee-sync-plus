@@ -510,21 +510,23 @@ export class ConflictDiffModal extends Modal {
 		this.bodyEl.createEl("p", { text: l.diffLoading });
 
 		const footer = contentEl.createDiv("gitee-sync-plus-conflict-diff-footer");
-		const right = footer.createDiv("gitee-sync-plus-conflict-diff-footer-right");
-		const keepLocal = right.createEl("button", {
+		const left = footer.createDiv("gitee-sync-plus-conflict-diff-footer-left");
+		const keepLocal = left.createEl("button", {
 			text: l.conflictUseLocal,
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-local",
 		});
 		keepLocal.addEventListener("click", () => {
 			this.setAllChoices("local");
 		});
-		const useRemote = right.createEl("button", {
+		const useRemote = left.createEl("button", {
 			text: l.conflictUseRemote,
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-remote",
 		});
 		useRemote.addEventListener("click", () => {
 			this.setAllChoices("remote");
 		});
+
+		const right = footer.createDiv("gitee-sync-plus-conflict-diff-footer-right");
 		const applyMerge = right.createEl("button", {
 			text: l.conflictApplyMerge,
 			cls: "gitee-sync-plus-conflict-btn gitee-sync-plus-conflict-btn-merge mod-cta",
