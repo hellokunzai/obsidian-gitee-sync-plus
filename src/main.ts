@@ -26,9 +26,36 @@ interface PluginData {
 // synced by iCloud between devices, but the three-way merge base is device-local.
 const LOCAL_SYNC_STATE_KEY = "gitee-sync-plus-sync-state-v1";
 
+/** Identifies a sync destination so the three-way baseline is tracked per repository.
+ * The token is intentionally excluded — it is authentication, not identity, so
+ * switching tokens on the same repo does not reset the baseline. */
+function remoteKeyOf(s: SyncSettings): string {
+	const map = s as unknown as Record<string, string>;
+	const owner = map[`${s.backend}Owner`] ?? "";
+	const repo = map[`${s.backend}Repo`] ?? "";
+	const branch = map[`${s.backend}Branch`] ?? "";
+	return `${s.backend}:${owner}/${repo}@${branch}`;
+}
+
+/** One-time migration: the baseline used to be a single flat path→hash map shared
+ * across all remotes. Wrap any legacy flat map under the current remote's key so
+ * existing users keep their baseline for the repo they last synced to. */
+function migrateSyncState(
+	raw: unknown,
+	s: SyncSettings
+): Record<string, Record<string, string>> {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+	const values = Object.values(raw as Record<string, unknown>);
+	const flat = values.length > 0 && values.every((v) => typeof v === "string");
+	if (flat) {
+		return { [remoteKeyOf(s)]: raw as Record<string, string> };
+	}
+	return raw as Record<string, Record<string, string>>;
+}
+
 export default class CloudSyncPlugin extends Plugin {
 	settings: SyncSettings = { ...DEFAULT_SETTINGS };
-	syncState: Record<string, string> = {};
+	syncState: Record<string, Record<string, string>> = {};
 	hashCache: Record<string, HashCacheEntry> = {};
 	gitIgnoreManager!: GitIgnoreManager;
 	tokenManager!: TokenManager;
@@ -84,6 +111,11 @@ export default class CloudSyncPlugin extends Plugin {
 			id: "open-git-panel",
 			name: l.panelOpenCommand,
 			callback: () => void this.activateGitPanel(),
+		});
+		this.addCommand({
+			id: "reset-sync-state",
+			name: l.commandResetSyncState,
+			callback: () => void this.resetSyncState(),
 		});
 
 		this.setupAutoSync();
@@ -251,7 +283,7 @@ export default class CloudSyncPlugin extends Plugin {
 			this.settings.backend = "gitee";
 		}
 		this.syncState =
-			(this.app.loadLocalStorage(LOCAL_SYNC_STATE_KEY) as Record<string, string> | null) ?? {};
+			migrateSyncState(this.app.loadLocalStorage(LOCAL_SYNC_STATE_KEY), this.settings) ?? {};
 		this.hashCache = data?.hashCache ?? {};
 
 		// Refresh in-memory tokens from the currently selected keychain keys.
@@ -282,6 +314,35 @@ export default class CloudSyncPlugin extends Plugin {
 		const data: PluginData = { settings: persist, hashCache: this.hashCache };
 		await this.saveData(data);
 		this.notifyGitPanelsOfSettingsChange();
+	}
+
+	/** Key identifying the currently configured remote destination. */
+	private currentRemoteKey(): string {
+		return remoteKeyOf(this.settings);
+	}
+
+	/** The three-way baseline (path→hash) for the currently configured remote. */
+	get baseline(): Record<string, string> {
+		return this.syncState[this.currentRemoteKey()] ?? {};
+	}
+	set baseline(map: Record<string, string>) {
+		this.syncState[this.currentRemoteKey()] = map;
+	}
+
+	/** Records a single path's baseline hash for the current remote (used by the diff view's "mark as synced"). */
+	markBaseline(path: string, hash: string): void {
+		const key = this.currentRemoteKey();
+		if (!this.syncState[key]) this.syncState[key] = {};
+		this.syncState[key][path] = hash;
+	}
+
+	/** Clears the baseline for the CURRENT remote only, so the next sync treats it
+	 * as a fresh destination and uploads everything locally (full push). Other
+	 * remotes' baselines are preserved. */
+	async resetSyncState(): Promise<void> {
+		this.syncState[this.currentRemoteKey()] = {};
+		await this.savePluginData();
+		new Notice(messages().syncStateReset);
 	}
 
 	/**

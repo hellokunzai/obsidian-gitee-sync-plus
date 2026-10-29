@@ -535,7 +535,7 @@ export class DiffView extends ItemView {
 			const backend = createBackend(this.plugin.settings);
 			const normalized = new TextEncoder().encode(normalizeLineEndings(localText)).buffer;
 			const localHash = await backend.hashData(normalized);
-			this.plugin.syncState[path] = localHash;
+			this.plugin.markBaseline(path, localHash);
 			await this.plugin.savePluginData();
 			new Notice(l.diffMarkedAsSynced(path));
 		} catch (e) {

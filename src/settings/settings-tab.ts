@@ -8,6 +8,7 @@ import { DEFAULT_GITEA_URL, fetchGiteaBranches, testGiteaToken } from "../backen
 import { TokenManager, type TokenHost } from "../utils/token-manager";
 import type { BackendType, SyncSettings } from "../types/settings";
 import { TokenSelectModal } from "./token-select-modal";
+import { ConfirmModal } from "../ui/git-panel-view";
 
 interface BranchCache {
 	branches: string[];
@@ -323,15 +324,32 @@ export class SyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(l.settingsDebugLog)
 			.setDesc(l.settingsDebugLogDesc)
-			.addToggle((t) =>
-				t.setValue(s.debugLog).onChange(async (v) => {
-					s.debugLog = v;
-					await save();
-				})
-			);
+		.addToggle((t) =>
+			t.setValue(s.debugLog).onChange(async (v) => {
+				s.debugLog = v;
+				await save();
+			})
+		);
 
-		new Setting(containerEl)
-			.setName(l.settingsExcludeFolders)
+	new Setting(containerEl)
+		.setName(l.settingsResetSyncState)
+		.setDesc(l.settingsResetSyncStateDesc)
+		.addButton((b) =>
+			b.setButtonText(l.buttonReset).setWarning().onClick(async () => {
+				new ConfirmModal(
+					this.app,
+					l.resetConfirmTitle,
+					l.resetConfirmDesc,
+					l.buttonReset,
+					async () => {
+						await this.plugin.resetSyncState();
+					}
+				).open();
+			})
+		);
+
+	new Setting(containerEl)
+		.setName(l.settingsExcludeFolders)
 			.setDesc(l.settingsExcludeFoldersDesc)
 			.addTextArea((t) => {
 				t.setValue(gitignoreContent);
@@ -341,8 +359,8 @@ export class SyncSettingTab extends PluginSettingTab {
 					await this.plugin.gitIgnoreManager.writeFullContent(t.getValue());
 				});
 			})
-			.settingEl.addClass('gitee-sync-plus-gitignore-setting');
-	}
+		.settingEl.addClass('gitee-sync-plus-gitignore-setting');
+}
 
 	private renderRepoSection(host: Host, tokenName: string, tokenDesc: string): void {
 		const l = messages();

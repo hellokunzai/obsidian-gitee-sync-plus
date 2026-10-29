@@ -166,7 +166,7 @@ export class SyncEngine {
 			await this.executePush(backend, plan, nextState, summary, { message });
 		} catch (e) {
 			// Persist what already succeeded so a re-run doesn't redo it.
-			this.plugin.syncState = nextState;
+			this.plugin.baseline = nextState;
 			await this.plugin.savePluginData();
 			if (this.plugin.settings.debugLog) {
 				await this.plugin.appendLog(
@@ -182,7 +182,7 @@ export class SyncEngine {
 			throw e;
 		}
 
-		this.plugin.syncState = nextState;
+		this.plugin.baseline = nextState;
 		await this.plugin.savePluginData();
 		if (this.plugin.settings.debugLog) {
 			await this.plugin.appendLog(
@@ -224,11 +224,11 @@ export class SyncEngine {
 		try {
 			await this.executePull(backend, plan, nextState, summary, conflictResolutions);
 		} catch (e) {
-			this.plugin.syncState = nextState;
+			this.plugin.baseline = nextState;
 			await this.plugin.savePluginData();
 			throw e;
 		}
-		this.plugin.syncState = nextState;
+		this.plugin.baseline = nextState;
 		await this.plugin.savePluginData();
 		return summary;
 	}
@@ -254,11 +254,11 @@ export class SyncEngine {
 		try {
 			await this.executePush(backend, plan, nextState, summary, { message, staged });
 		} catch (e) {
-			this.plugin.syncState = nextState;
+			this.plugin.baseline = nextState;
 			await this.plugin.savePluginData();
 			throw e;
 		}
-		this.plugin.syncState = nextState;
+		this.plugin.baseline = nextState;
 		await this.plugin.savePluginData();
 		return summary;
 	}
@@ -275,7 +275,7 @@ export class SyncEngine {
 	async discardChanges(plan: SyncPlan, paths: string[]): Promise<number> {
 		const backend = createBackend(this.plugin.settings);
 		const wanted = new Set(paths);
-		const nextState = { ...this.plugin.syncState };
+		const nextState = { ...this.plugin.baseline };
 		let count = 0;
 		for (const p of plan.pushes) {
 			if (!wanted.has(p.path)) continue;
@@ -300,7 +300,7 @@ export class SyncEngine {
 			}
 			count++;
 		}
-		this.plugin.syncState = nextState;
+		this.plugin.baseline = nextState;
 		await this.plugin.savePluginData();
 		return count;
 	}
@@ -516,7 +516,7 @@ export class SyncEngine {
 		const remote = new Map<string, RemoteEntry>(
 			remoteList.filter((e) => !this.isExcluded(e.path)).map((e) => [e.path, e])
 		);
-		const base = this.plugin.syncState;
+		const base = this.plugin.baseline;
 		const basePaths = Object.keys(base).filter((p) => !this.isExcluded(p));
 
 		const plan: SyncPlan = {

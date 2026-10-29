@@ -26,13 +26,18 @@ function fileBasename(path: string): string {
 }
 
 /** Destructive-action confirm modal (discard local changes). */
-class DiscardConfirmModal extends Modal {
+/** Generic confirmation modal used for destructive actions (discard changes, reset baseline). */
+export class ConfirmModal extends Modal {
+	private readonly title: string;
 	private readonly message: string;
+	private readonly confirmLabel: string;
 	private readonly onConfirm: () => void;
 
-	constructor(app: App, message: string, onConfirm: () => void) {
+	constructor(app: App, title: string, message: string, confirmLabel: string, onConfirm: () => void) {
 		super(app);
+		this.title = title;
 		this.message = message;
+		this.confirmLabel = confirmLabel;
 		this.onConfirm = onConfirm;
 	}
 
@@ -40,13 +45,13 @@ class DiscardConfirmModal extends Modal {
 		const l = messages();
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h3", { text: l.panelDiscardConfirmTitle });
+		contentEl.createEl("h3", { text: this.title });
 		contentEl.createEl("p", { text: this.message });
 		const row = contentEl.createDiv("modal-button-row");
 		row
 			.createEl("button", { text: l.cancel, cls: "mod-cancel" })
 			.addEventListener("click", () => this.close());
-		const ok = row.createEl("button", { text: l.panelDiscard, cls: "mod-warning" });
+		const ok = row.createEl("button", { text: this.confirmLabel, cls: "mod-warning" });
 		ok.addEventListener("click", () => {
 			this.close();
 			this.onConfirm();
@@ -453,8 +458,12 @@ export class GitPanelView extends ItemView {
 
 	private onDiscard(path: string): void {
 		const l = messages();
-		new DiscardConfirmModal(this.app, l.panelDiscardConfirm(path), () =>
-			void this.doDiscard([path])
+		new ConfirmModal(
+			this.app,
+			l.panelDiscardConfirmTitle,
+			l.panelDiscardConfirm(path),
+			l.panelDiscard,
+			() => void this.doDiscard([path])
 		).open();
 	}
 
@@ -466,8 +475,12 @@ export class GitPanelView extends ItemView {
 			...this.plan.remoteDeletes.filter((x) => !this.staged.has(x.path)).map((x) => x.path),
 		];
 		if (paths.length === 0) return;
-		new DiscardConfirmModal(this.app, l.panelDiscardAllConfirm(paths.length), () =>
-			void this.doDiscard(paths)
+		new ConfirmModal(
+			this.app,
+			l.panelDiscardConfirmTitle,
+			l.panelDiscardAllConfirm(paths.length),
+			l.panelDiscard,
+			() => void this.doDiscard(paths)
 		).open();
 	}
 
