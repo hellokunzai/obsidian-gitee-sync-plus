@@ -170,6 +170,9 @@ export class GitPanelView extends ItemView {
 		if (s.backend === "gitlab") {
 			return `gitlab: ${s.gitlabOwner}/${s.gitlabRepo}@${s.gitlabBranch}`;
 		}
+		if (s.backend === "gitea") {
+			return `gitea: ${s.giteaOwner}/${s.giteaRepo}@${s.giteaBranch}`;
+		}
 		return `gitee: ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
 	}
 

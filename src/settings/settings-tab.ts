@@ -4,6 +4,7 @@ import type CloudSyncPlugin from "../main";
 import { fetchGiteeBranches, testGiteeToken } from "../backends/gitee";
 import { fetchGithubBranches, testGithubToken } from "../backends/github";
 import { DEFAULT_GITLAB_URL, fetchGitLabBranches, testGitLabToken } from "../backends/gitlab";
+import { DEFAULT_GITEA_URL, fetchGiteaBranches, testGiteaToken } from "../backends/gitea";
 import { TokenManager, type TokenHost } from "../utils/token-manager";
 import type { BackendType, SyncSettings } from "../types/settings";
 import { TokenSelectModal } from "./token-select-modal";
@@ -13,14 +14,14 @@ interface BranchCache {
 	timestamp: number;
 }
 
-type Host = "gitee" | "github" | "gitlab";
+type Host = "gitee" | "github" | "gitlab" | "gitea";
 
 interface HostCfg {
-	ownerKey: "giteeOwner" | "githubOwner" | "gitlabOwner";
-	repoKey: "giteeRepo" | "githubRepo" | "gitlabRepo";
-	branchKey: "giteeBranch" | "githubBranch" | "gitlabBranch";
-	tokenKey: "giteeToken" | "githubToken" | "gitlabToken";
-	profileKey: "giteeTokenProfile" | "githubTokenProfile" | "gitlabTokenProfile";
+	ownerKey: "giteeOwner" | "githubOwner" | "gitlabOwner" | "giteaOwner";
+	repoKey: "giteeRepo" | "githubRepo" | "gitlabRepo" | "giteaRepo";
+	branchKey: "giteeBranch" | "githubBranch" | "gitlabBranch" | "giteaBranch";
+	tokenKey: "giteeToken" | "githubToken" | "gitlabToken" | "giteaToken";
+	profileKey: "giteeTokenProfile" | "githubTokenProfile" | "gitlabTokenProfile" | "giteaTokenProfile";
 	ownerLabel: keyof Messages;
 	defaultBranch: string;
 	missingSettings: keyof Messages;
@@ -75,6 +76,19 @@ function hostCfg(host: Host): HostCfg {
 				testToken: testGitLabToken,
 				fetchBranches: fetchGitLabBranches,
 			};
+		case "gitea":
+			return {
+				ownerKey: "giteaOwner",
+				repoKey: "giteaRepo",
+				branchKey: "giteaBranch",
+				tokenKey: "giteaToken",
+				profileKey: "giteaTokenProfile",
+				ownerLabel: "settingsGiteaOwner",
+				defaultBranch: "main",
+				missingSettings: "missingGiteaSettings",
+				testToken: testGiteaToken,
+				fetchBranches: fetchGiteaBranches,
+			};
 	}
 }
 
@@ -122,6 +136,12 @@ export const DEFAULT_SETTINGS: SyncSettings = {
 	gitlabToken: "",
 	gitlabTokenProfile: "",
 	gitlabUrl: DEFAULT_GITLAB_URL,
+	giteaOwner: "",
+	giteaRepo: "",
+	giteaBranch: "main",
+	giteaToken: "",
+	giteaTokenProfile: "",
+	giteaUrl: DEFAULT_GITEA_URL,
 	autoSyncMinutes: 0,
 	syncOnStart: false,
 	debugLog: false,
@@ -171,6 +191,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					.addOption("gitee", l.optionGitee)
 					.addOption("github", l.optionGithub)
 					.addOption("gitlab", l.optionGitlab)
+					.addOption("gitea", l.optionGitea)
 					.setValue(s.backend)
 					.onChange(async (v) => {
 						s.backend = v as BackendType;
@@ -183,7 +204,7 @@ export class SyncSettingTab extends PluginSettingTab {
 			this.renderRepoSection("gitee", l.settingsGiteeToken, l.settingsGiteeTokenDesc);
 		} else if (s.backend === "github") {
 			this.renderRepoSection("github", l.settingsGithubToken, l.settingsGithubTokenDesc);
-		} else {
+		} else if (s.backend === "gitlab") {
 			this.renderRepoSection("gitlab", l.settingsGitlabToken, l.settingsGitlabTokenDesc);
 			new Setting(containerEl)
 				.setName(l.settingsGitlabUrl)
@@ -196,6 +217,21 @@ export class SyncSettingTab extends PluginSettingTab {
 							s.gitlabUrl = v.trim() || DEFAULT_GITLAB_URL;
 							await save();
 							void this.refreshBranchDropdown("gitlab");
+						})
+				);
+		} else {
+			this.renderRepoSection("gitea", l.settingsGiteaToken, l.settingsGiteaTokenDesc);
+			new Setting(containerEl)
+				.setName(l.settingsGiteaUrl)
+				.setDesc(l.settingsGiteaUrlDesc)
+				.addText((t) =>
+					t
+						.setPlaceholder(DEFAULT_GITEA_URL)
+						.setValue(s.giteaUrl)
+						.onChange(async (v) => {
+							s.giteaUrl = v.trim() || DEFAULT_GITEA_URL;
+							await save();
+							void this.refreshBranchDropdown("gitea");
 						})
 				);
 		}
@@ -376,7 +412,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					const s = this.plugin.settings;
 					const owner = s[cfg.ownerKey];
 					const repo = s[cfg.repoKey];
-					const gitlabUrl = host === "gitlab" ? s.gitlabUrl : undefined;
+					const gitlabUrl = host === "gitlab" ? s.gitlabUrl : host === "gitea" ? s.giteaUrl : undefined;
 					const branch = s[cfg.branchKey];
 					if (!owner || !repo) {
 						new Notice(l[cfg.missingSettings] as string);
@@ -446,7 +482,7 @@ export class SyncSettingTab extends PluginSettingTab {
 					b.setDisabled(true);
 					try {
 						clearBranchCache(host, owner, repo);
-						const gitlabUrl = host === "gitlab" ? s.gitlabUrl : undefined;
+						const gitlabUrl = host === "gitlab" ? s.gitlabUrl : host === "gitea" ? s.giteaUrl : undefined;
 						const branches = await cfg.fetchBranches(owner, repo, token, gitlabUrl);
 						setCachedBranches(host, owner, repo, branches);
 						// 先记录当前选择，再清空并重新填充选项
@@ -513,7 +549,7 @@ export class SyncSettingTab extends PluginSettingTab {
 		if (!owner || !repo || !token) return;
 
 		try {
-			const gitlabUrl = host === "gitlab" ? s.gitlabUrl : undefined;
+			const gitlabUrl = host === "gitlab" ? s.gitlabUrl : host === "gitea" ? s.giteaUrl : undefined;
 			clearBranchCache(host, owner, repo);
 			const branches = await cfg.fetchBranches(owner, repo, token, gitlabUrl);
 			setCachedBranches(host, owner, repo, branches);

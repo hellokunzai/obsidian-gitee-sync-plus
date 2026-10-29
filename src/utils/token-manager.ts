@@ -4,7 +4,7 @@ import type CloudSyncPlugin from "../main";
 export const LEGACY_SECRET_GITEE = "gitee-sync-plus-gitee";
 export const LEGACY_SECRET_GITHUB = "gitee-sync-plus-github";
 
-export type TokenHost = "gitee" | "github" | "gitlab";
+export type TokenHost = "gitee" | "github" | "gitlab" | "gitea";
 
 /**
  * Reads the list of secret IDs stored in Obsidian's keychain.
@@ -98,6 +98,7 @@ export class TokenManager {
 		const s = this.plugin.settings;
 		if (host === "gitee") return s.giteeTokenProfile;
 		if (host === "github") return s.githubTokenProfile;
+		if (host === "gitea") return s.giteaTokenProfile;
 		return s.gitlabTokenProfile;
 	}
 
@@ -108,6 +109,8 @@ export class TokenManager {
 			s.giteeTokenProfile = key ?? "";
 		} else if (host === "github") {
 			s.githubTokenProfile = key ?? "";
+		} else if (host === "gitea") {
+			s.giteaTokenProfile = key ?? "";
 		} else {
 			s.gitlabTokenProfile = key ?? "";
 		}
@@ -124,6 +127,8 @@ export class TokenManager {
 			s.giteeToken = token ?? "";
 		} else if (host === "github") {
 			s.githubToken = token ?? "";
+		} else if (host === "gitea") {
+			s.giteaToken = token ?? "";
 		} else {
 			s.gitlabToken = token ?? "";
 		}

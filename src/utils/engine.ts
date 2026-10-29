@@ -674,7 +674,9 @@ export class SyncEngine {
 				? `github ${s.githubOwner}/${s.githubRepo}@${s.githubBranch}`
 				: s.backend === "gitlab"
 					? `gitlab ${s.gitlabOwner}/${s.gitlabRepo}@${s.gitlabBranch}`
-					: `gitee ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
+					: s.backend === "gitea"
+						? `gitea ${s.giteaOwner}/${s.giteaRepo}@${s.giteaBranch}`
+						: `gitee ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
 		const lines: string[] = [];
 		lines.push(`\n## ${title} ${formatDateTime()}`);
 		lines.push(

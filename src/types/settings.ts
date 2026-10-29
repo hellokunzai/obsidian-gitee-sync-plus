@@ -1,4 +1,4 @@
-export type BackendType = "gitee" | "github" | "gitlab";
+export type BackendType = "gitee" | "github" | "gitlab" | "gitea";
 export type CommitMode = "per-file" | "batch";
 export type MergeStrategy = "mtime" | "remote" | "local";
 
@@ -28,6 +28,13 @@ export interface SyncSettings {
 	gitlabToken: string;
 	gitlabTokenProfile: string;
 	gitlabUrl: string;
+	/* Gitea */
+	giteaOwner: string;
+	giteaRepo: string;
+	giteaBranch: string;
+	giteaToken: string;
+	giteaTokenProfile: string;
+	giteaUrl: string;
 	/* common */
 	autoSyncMinutes: number;
 	syncOnStart: boolean;

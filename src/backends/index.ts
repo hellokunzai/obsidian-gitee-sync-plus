@@ -4,8 +4,21 @@ import { messages } from "../utils/i18n";
 import { GiteeBackend } from "./gitee";
 import { GitHubBackend } from "./github";
 import { DEFAULT_GITLAB_URL, GitLabBackend } from "./gitlab";
+import { DEFAULT_GITEA_URL, GiteaBackend } from "./gitea";
 
 export function createBackend(s: SyncSettings): StorageBackend {
+	if (s.backend === "gitea") {
+		if (!s.giteaOwner || !s.giteaRepo || !s.giteaToken) {
+			throw new Error(messages().missingGiteaSettings);
+		}
+		return new GiteaBackend({
+			owner: s.giteaOwner,
+			repo: s.giteaRepo,
+			branch: s.giteaBranch || "main",
+			token: s.giteaToken,
+			giteaUrl: s.giteaUrl || DEFAULT_GITEA_URL,
+		});
+	}
 	if (s.backend === "gitlab") {
 		if (!s.gitlabOwner || !s.gitlabRepo || !s.gitlabToken) {
 			throw new Error(messages().missingGitlabSettings);

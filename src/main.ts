@@ -245,7 +245,8 @@ export default class CloudSyncPlugin extends Plugin {
 		if (
 			this.settings.backend !== "gitee" &&
 			this.settings.backend !== "github" &&
-			this.settings.backend !== "gitlab"
+			this.settings.backend !== "gitlab" &&
+			this.settings.backend !== "gitea"
 		) {
 			this.settings.backend = "gitee";
 		}
@@ -257,6 +258,7 @@ export default class CloudSyncPlugin extends Plugin {
 		await this.tokenManager.refreshInMemoryToken("gitee");
 		await this.tokenManager.refreshInMemoryToken("github");
 		await this.tokenManager.refreshInMemoryToken("gitlab");
+		await this.tokenManager.refreshInMemoryToken("gitea");
 	}
 
 	/**
@@ -275,6 +277,7 @@ export default class CloudSyncPlugin extends Plugin {
 			giteeToken: ss ? "" : this.settings.giteeToken,
 			githubToken: ss ? "" : this.settings.githubToken,
 			gitlabToken: ss ? "" : this.settings.gitlabToken,
+			giteaToken: ss ? "" : this.settings.giteaToken,
 		};
 		const data: PluginData = { settings: persist, hashCache: this.hashCache };
 		await this.saveData(data);

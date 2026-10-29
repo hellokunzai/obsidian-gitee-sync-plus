@@ -29,6 +29,7 @@ const en = {
 
 	missingGithubSettings: "Enter the GitHub owner, repository, and access token in settings first.",
 	missingGitlabSettings: "Enter the GitLab owner, repository, and access token in settings first.",
+	missingGiteaSettings: "Enter the Gitea owner, repository, and access token in settings first.",
 	gitlabForbiddenHint:
 		"If the repository is not empty, the access token is missing the read_repository (or api) scope — GET /projects/:id only needs read_api.",
 	gitlabTestScopeError:
@@ -57,15 +58,20 @@ const en = {
 	optionGitee: "Gitee repository",
 	optionGithub: "GitHub repository",
 	optionGitlab: "GitLab repository",
+	optionGitea: "Gitea repository",
 	settingsGiteeOwner: "Gitee owner",
 	settingsGithubOwner: "GitHub owner",
 	settingsGitlabOwner: "GitLab owner",
+	settingsGiteaOwner: "Gitea owner",
 	settingsOwnerDesc: "User or organization that owns the repository, as shown in its URL.",
 	settingsRepo: "Repository name",
 	settingsRepoDesc: "A dedicated private repository is recommended.",
 	settingsGitlabUrl: "GitLab instance URL",
 	settingsGitlabUrlDesc:
 		"Base URL of your GitLab instance. Use https://gitlab.com for the hosted service or your self-managed domain.",
+	settingsGiteaUrl: "Gitea instance URL",
+	settingsGiteaUrlDesc:
+		"Base URL of your Gitea instance. Use https://gitea.com for the hosted service or your self-managed domain.",
 	settingsBranch: "Branch",
 	settingsBranchNeedInfo: "Fill in owner, repository, and token to auto-populate branches.",
 	settingsBranchLoadFailed: "Failed to fetch branches. Check owner, repository, and token.",
@@ -76,6 +82,8 @@ const en = {
 	settingsGithubTokenDesc: "GitHub Settings → Developer settings → Personal access tokens; enable the repo permission.",
 	settingsGitlabToken: "Access token",
 	settingsGitlabTokenDesc: "GitLab Settings → Access Tokens. The api scope (full read/write) is simplest; or grant read_repository + write_repository. GET /projects/:id only needs read_api, which is why a too-narrow token can pass the test but fail to sync.",
+	settingsGiteaToken: "Access token",
+	settingsGiteaTokenDesc: "Gitea Settings → Applications → Generate Token (or your instance's access token page). A token with repo read/write is required.",
 	tokenStoredInKeychain: "This token is automatically stored in your Obsidian keychain for security.",
 	keychainMigrated: "Token moved to your Obsidian keychain for security.",
 	keychainMigrateFailed: (msg: string) => `Keychain write failed: ${msg}`,
@@ -323,6 +331,7 @@ const zh: typeof en = {
 
 	missingGithubSettings: "请先在设置中填写 GitHub 用户名、仓库名和访问令牌。",
 	missingGitlabSettings: "请先在设置中填写 GitLab 用户名、仓库名和访问令牌。",
+	missingGiteaSettings: "请先在设置中填写 Gitea 用户名、仓库名和访问令牌。",
 	gitlabForbiddenHint:
 		"若仓库非空，说明访问令牌缺少 read_repository（或 api）权限——GET /projects/:id 仅需 read_api，因此连接测试能通过而同步会失败。",
 	gitlabTestScopeError:
@@ -348,14 +357,18 @@ const zh: typeof en = {
 	optionGitee: "Gitee 仓库",
 	optionGithub: "GitHub 仓库",
 	optionGitlab: "GitLab 仓库",
+	optionGitea: "Gitea 仓库",
 	settingsGiteeOwner: "Gitee 用户名",
 	settingsGithubOwner: "GitHub 用户名",
 	settingsGitlabOwner: "GitLab 用户名",
+	settingsGiteaOwner: "Gitea 用户名",
 	settingsOwnerDesc: "仓库所属的用户名或组织名（即仓库 URL 中的 owner）。",
 	settingsRepo: "仓库名",
 	settingsRepoDesc: "建议使用一个专门的私有仓库。",
 	settingsGitlabUrl: "GitLab 实例地址",
 	settingsGitlabUrlDesc: "你的 GitLab 实例基础地址。托管版使用 https://gitlab.com，自建版填写你的域名。",
+	settingsGiteaUrl: "Gitea 实例地址",
+	settingsGiteaUrlDesc: "你的 Gitea 实例基础地址。托管版使用 https://gitea.com，自建版填写你的域名。",
 	settingsBranch: "分支",
 	settingsBranchNeedInfo: "填写用户名、仓库名和令牌后可自动获取分支列表。",
 	settingsBranchLoadFailed: "无法获取分支列表，请检查用户名、仓库名和令牌是否正确。",
@@ -366,6 +379,8 @@ const zh: typeof en = {
 	settingsGithubTokenDesc: "GitHub 设置 → Developer settings → 访问令牌，需勾选 repo 权限。",
 	settingsGitlabToken: "访问令牌",
 	settingsGitlabTokenDesc: "GitLab 设置 → 访问令牌。勾选 api（含读写）最省事；或分别勾选 read_repository 与 write_repository。注意 GET /projects/:id 仅需 read_api，所以权限过窄的令牌会通过测试却在同步时失败。",
+	settingsGiteaToken: "访问令牌",
+	settingsGiteaTokenDesc: "Gitea 设置 → 应用 → 生成令牌（或实例的访问令牌页面）。需具备仓库读写权限。",
 	tokenStoredInKeychain: "该令牌会自动存入你的 Obsidian 钥匙串（设置 → 钥匙串），数据文件中不再保留明文。",
 	keychainMigrated: "令牌已迁移到 Obsidian 钥匙串。",
 	keychainMigrateFailed: (msg: string) => `钥匙串写入失败：${msg}`,
