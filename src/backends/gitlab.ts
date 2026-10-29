@@ -71,10 +71,20 @@ export class GitLabBackend implements StorageBackend {
 				detail = resp.text.slice(0, 200);
 			}
 			let message = l.apiFailed("gitlab", method, resp.status, detail);
-			// A 403 on a repository endpoint almost always means the token lacks
-			// the read_repository (or api) scope — GET /projects/:id only needs
-			// read_api, which is why the connection test can pass while sync fails.
-			if (resp.status === 403) message += " " + l.gitlabForbiddenHint;
+			// A 403 means different things for reads and writes. Reads usually fail
+			// on a missing read_repository scope; writes usually fail because the
+			// branch is protected and the token's role cannot push to it.
+			if (resp.status === 403) {
+				const isWrite = method !== "GET" && method !== "HEAD";
+				const protectedBranch = /not allowed to push/i.test(detail);
+				if (protectedBranch) {
+					message += " " + l.gitlabProtectedBranchHint;
+				} else if (isWrite) {
+					message += " " + l.gitlabWriteForbiddenHint;
+				} else {
+					message += " " + l.gitlabForbiddenHint;
+				}
+			}
 			throw new GitLabError(resp.status, message);
 		}
 		return resp;
@@ -231,8 +241,14 @@ export class GitLabBackend implements StorageBackend {
 	}
 }
 
-/** Verify that a token can actually sync: reach the project AND read its repository. */
-export async function testGitLabToken(owner: string, repo: string, token: string, gitlabUrl = DEFAULT_GITLAB_URL): Promise<void> {
+/** Verify that a token can actually sync: reach the project, read the repository, and push to the branch. */
+export async function testGitLabToken(
+	owner: string,
+	repo: string,
+	token: string,
+	gitlabUrl = DEFAULT_GITLAB_URL,
+	branch?: string
+): Promise<void> {
 	const url = (gitlabUrl || DEFAULT_GITLAB_URL).replace(/\/+$/, "");
 	const projectId = encodeURIComponent(`${owner}/${repo}`);
 	const l = messages();
@@ -266,7 +282,55 @@ export async function testGitLabToken(owner: string, repo: string, token: string
 	if (tree.status === 403) {
 		throw new GitLabError(403, l.gitlabTestScopeError);
 	}
-	// 200 or 404 → the token can sync.
+	// 200 or 404 → the token can read. Now make sure it can also WRITE, which is
+	// where "the test passes but sync fails" usually comes from: a protected
+	// branch that only Maintainers can push to. Best effort — any unexpected
+	// response shape simply skips the check instead of failing the test.
+	if (!branch) return;
+	const branchResp = await requestUrl({
+		url: `${url}/api/v4/projects/${projectId}/repository/branches/${encodeURIComponent(branch)}`,
+		method: "GET",
+		throw: false,
+		headers: { "PRIVATE-TOKEN": token },
+	});
+	if (branchResp.status !== 200) return;
+	if (!(branchResp.json as { protected?: boolean }).protected) return;
+
+	// The branch is protected. Find out whether the token's role may push to it.
+	const projectJson = project.json as {
+		permissions?: {
+			project_access?: { access_level?: number } | null;
+			group_access?: { access_level?: number } | null;
+		};
+	};
+	const tokenLevel =
+		projectJson.permissions?.project_access?.access_level ??
+		projectJson.permissions?.group_access?.access_level ??
+		0;
+	const protection = await requestUrl({
+		url: `${url}/api/v4/projects/${projectId}/protected_branches/${encodeURIComponent(branch)}`,
+		method: "GET",
+		throw: false,
+		headers: { "PRIVATE-TOKEN": token },
+	});
+	if (protection.status === 200) {
+		const levels = (protection.json as { push_access_levels?: { access_level?: number }[] })
+			.push_access_levels;
+		if (levels && levels.length > 0) {
+			const canPush = levels.some((a) => {
+				const lvl = a.access_level ?? 0;
+				return lvl > 0 && tokenLevel >= lvl;
+			});
+			if (!canPush) throw new GitLabError(403, l.gitlabProtectedBranchHint);
+			return;
+		}
+	}
+	// Could not read the protection config. Maintainer (40) and above bypass it;
+	// a lower role cannot push to a protected branch under GitLab's default
+	// policy, so surface the problem here rather than during the sync.
+	if (tokenLevel > 0 && tokenLevel < 40) {
+		throw new GitLabError(403, l.gitlabProtectedBranchHint);
+	}
 }
 
 /** Fetch branch list from a GitLab project. */

@@ -33,6 +33,10 @@ const en = {
 		"If the repository is not empty, the access token is missing the read_repository (or api) scope — GET /projects/:id only needs read_api.",
 	gitlabTestScopeError:
 		"Token can reach the project but cannot read the repository. Grant the api scope (or read_repository + write_repository) when creating the access token.",
+	gitlabProtectedBranchHint:
+		"The target branch is protected and this token's role cannot push to it. Re-create the access token with the Maintainer role, or in the project's Settings → Repository → Protected branches allow Developers to push.",
+	gitlabWriteForbiddenHint:
+		"The token cannot write to this repository. Use a role of at least Developer and make sure the token has the write_repository (or api) scope.",
 	missingGiteeSettings: "Enter the Gitee owner, repository, and personal access token in settings first.",
 	apiFailed: (host: string, method: string, status: number, detail: string) =>
 		`${host} API ${method} failed (${status}): ${detail}`,
@@ -323,6 +327,10 @@ const zh: typeof en = {
 		"若仓库非空，说明访问令牌缺少 read_repository（或 api）权限——GET /projects/:id 仅需 read_api，因此连接测试能通过而同步会失败。",
 	gitlabTestScopeError:
 		"令牌可访问项目但无法读取仓库内容，请在创建访问令牌时勾选 api 权限（或 read_repository + write_repository）。",
+	gitlabProtectedBranchHint:
+		"目标分支受保护，当前令牌角色无权推送。请用 Maintainer 角色重新生成访问令牌，或在项目 设置 → 仓库 → 受保护分支 中允许 Developers 推送。",
+	gitlabWriteForbiddenHint:
+		"令牌无权写入该仓库。请使用 Developer 及以上角色，并确保令牌具备 write_repository（或 api）权限。",
 	missingGiteeSettings: "请先在设置中填写 Gitee 用户名、仓库名和私人令牌。",
 	apiFailed: (host, method, status, detail) => `${host} API ${method} 失败（${status}）：${detail}`,
 	remoteTreeTruncated: "远端返回的文件树被截断（文件数过多），已中止同步以防误删。",

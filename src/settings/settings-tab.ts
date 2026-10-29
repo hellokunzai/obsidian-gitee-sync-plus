@@ -24,7 +24,13 @@ interface HostCfg {
 	ownerLabel: keyof Messages;
 	defaultBranch: string;
 	missingSettings: keyof Messages;
-	testToken: (owner: string, repo: string, token: string, gitlabUrl?: string) => Promise<void>;
+	testToken: (
+		owner: string,
+		repo: string,
+		token: string,
+		gitlabUrl?: string,
+		branch?: string
+	) => Promise<void>;
 	fetchBranches: (owner: string, repo: string, token: string, gitlabUrl?: string) => Promise<string[]>;
 }
 
@@ -371,13 +377,14 @@ export class SyncSettingTab extends PluginSettingTab {
 					const owner = s[cfg.ownerKey];
 					const repo = s[cfg.repoKey];
 					const gitlabUrl = host === "gitlab" ? s.gitlabUrl : undefined;
+					const branch = s[cfg.branchKey];
 					if (!owner || !repo) {
 						new Notice(l[cfg.missingSettings] as string);
 						return;
 					}
 					b.setDisabled(true);
 					try {
-						await cfg.testToken(owner, repo, token, gitlabUrl);
+						await cfg.testToken(owner, repo, token, gitlabUrl, branch);
 						new Notice(l.tokenTestSuccess);
 					} catch (e: any) {
 						const msg = e instanceof Error ? e.message : String(e);
