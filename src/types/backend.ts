@@ -1,7 +1,3 @@
-import type { SyncSettings } from "./settings";
-import { GitHostBackend } from "./githost";
-import { messages } from "./i18n";
-
 export interface RemoteEntry {
 	path: string;
 	hash: string;
@@ -50,29 +46,4 @@ export interface StorageBackend {
 	 * method exists, it is used instead of per-file upload/remove calls.
 	 */
 	batchCommit?(files: BatchFileChange[], deletes: BatchDelete[], message?: string): Promise<void>;
-}
-
-export function createBackend(s: SyncSettings): StorageBackend {
-	if (s.backend === "github") {
-		if (!s.githubOwner || !s.githubRepo || !s.githubToken) {
-			throw new Error(messages().missingGithubSettings);
-		}
-		return new GitHostBackend({
-			host: "github",
-			owner: s.githubOwner,
-			repo: s.githubRepo,
-			branch: s.githubBranch || "main",
-			token: s.githubToken,
-		});
-	}
-	if (!s.giteeOwner || !s.giteeRepo || !s.giteeToken) {
-		throw new Error(messages().missingGiteeSettings);
-	}
-	return new GitHostBackend({
-		host: "gitee",
-		owner: s.giteeOwner,
-		repo: s.giteeRepo,
-		branch: s.giteeBranch || "master",
-		token: s.giteeToken,
-	});
 }

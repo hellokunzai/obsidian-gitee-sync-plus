@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>原型 A · 单行省略号（移动端冲突列表）</title>
+<style>
+  :root {
+    --background-primary: #ffffff;
+    --background-secondary: #f6f7f9;
+    --text-normal: #1c1e21;
+    --text-muted: #6a7077;
+    --text-faint: #9aa0a6;
+    --background-modifier-border: #e3e5e8;
+    --background-modifier-hover: #eef0f2;
+    --text-warning: #b5820a;
+    --text-success: #1e7d44;
+    --interactive-accent: #4d78cc;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-ui);
+    background: #c9ccd1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--background-secondary);
+    border-radius: 44px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    overflow: hidden;
+    position: relative;
+    border: 10px solid #1c1c1e;
+  }
+  .statusbar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-normal);
+  }
+  .screen {
+    height: calc(100% - 44px);
+    background: var(--background-secondary);
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden; /* 关键：无水平滚动条 */
+  }
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+  .modal {
+    background: var(--background-primary);
+    border-radius: 12px;
+    width: 100%;          /* 自适应屏宽，无 min-width 固定值 -> 无水平溢出 */
+    max-width: 100%;
+    padding: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    max-height: 92%;
+    overflow: hidden;
+  }
+  .modal h3 { font-size: 1.05em; font-weight: 700; margin-bottom: 4px; }
+  .intro {
+    font-size: 0.82em;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .conflict-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 210px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-shrink: 0;
+  }
+  .conflict-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: var(--background-primary);
+  }
+  .conflict-item:hover { background: var(--background-modifier-hover); }
+  .status {
+    font-size: 0.7em;
+    flex-shrink: 0;
+    color: var(--text-warning);
+    line-height: 1;
+  }
+  .name {
+    font-weight: 600;
+    color: var(--text-normal);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    max-width: 110px;
+  }
+  .path {
+    font-size: 0.8em;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+  .footer-left { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: 0.78em;
+  }
+  .btn:hover { background: var(--background-modifier-hover); }
+  .footer-right { display: flex; align-items: center; gap: 8px; }
+  .btn-cta {
+    padding: 6px 14px;
+    border-radius: 4px;
+    background: var(--interactive-accent);
+    color: #fff;
+    border: none;
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+  .btn-cta:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(1);
+  }
+  /* 原型说明标签 */
+  .tag {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1c1c1e;
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="statusbar"><span>9:24</span><span>5G ▱</span></div>
+    <div class="screen">
+      <div class="modal-overlay">
+        <div class="modal">
+          <h3>解决拉取冲突</h3>
+          <p class="intro">自上次同步以来，有 2 个文件在两端都被修改。请逐一解决冲突后再确认拉取。</p>
+          <div class="conflict-list">
+            <div class="conflict-item" title="成人专升本/未命名.md">
+              <span class="status">●</span>
+              <span class="name">未命名.md</span>
+              <span class="path">成人专升本/未命名.md</span>
+            </div>
+            <div class="conflict-item" title="00-笔记/阅读/我的读书笔记-2026-修订版.md">
+              <span class="status">●</span>
+              <span class="name">我的读书笔记-2026-修订版.md</span>
+              <span class="path">00-笔记/阅读/我的读书笔记-2026-修订版.md</span>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="footer-left">
+              <button class="btn">全部使用远端</button>
+              <button class="btn">全部保留本地</button>
+            </div>
+            <div class="footer-right">
+              <button class="btn-cta" disabled>确认拉取</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tag">原型 A · 单行省略号（无水平滚动条 · 无"已解决"）</div>
+  </div>
+</body>
+</html>

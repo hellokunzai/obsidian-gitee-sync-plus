@@ -1,7 +1,7 @@
 import { App, ItemView, Modal, Notice, WorkspaceLeaf } from "obsidian";
-import type CloudSyncPlugin from "./main";
-import { createBackend } from "./backend";
-import { messages } from "./i18n";
+import type CloudSyncPlugin from "../main";
+import { createBackend } from "../backends/index";
+import { messages } from "../utils/i18n";
 
 export const DIFF_VIEW_TYPE = "gitee-sync-plus-diff";
 

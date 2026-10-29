@@ -1,10 +1,10 @@
 import { App, ItemView, Modal, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import type CloudSyncPlugin from "./main";
-import { messages } from "./i18n";
-import { SyncEngine, SyncPlan, type ConflictResolution } from "./sync";
-import type { RemoteEntry } from "./backend";
-import { DiffKind, openDiffView } from "./DiffView";
-import { ConflictResolverModal } from "./ConflictResolver";
+import type CloudSyncPlugin from "../main";
+import { messages } from "../utils/i18n";
+import { SyncEngine, type SyncPlan, type ConflictResolution } from "../utils/engine";
+import type { RemoteEntry } from "../types/backend";
+import { DiffKind, openDiffView } from "./diff-view";
+import { ConflictResolverModal } from "./conflict-resolver";
 
 export const GIT_PANEL_VIEW_TYPE = "gitee-sync-plus-git-panel";
 
@@ -166,6 +166,9 @@ export class GitPanelView extends ItemView {
 		const s = this.plugin.settings;
 		if (s.backend === "github") {
 			return `github: ${s.githubOwner}/${s.githubRepo}@${s.githubBranch}`;
+		}
+		if (s.backend === "gitlab") {
+			return `gitlab: ${s.gitlabOwner}/${s.gitlabRepo}@${s.gitlabBranch}`;
 		}
 		return `gitee: ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
 	}

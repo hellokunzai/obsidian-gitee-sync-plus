@@ -1,8 +1,10 @@
-import type CloudSyncPlugin from "./main";
+import type CloudSyncPlugin from "../main";
 
 /** Key names used by this plugin before named profiles were introduced. */
 export const LEGACY_SECRET_GITEE = "gitee-sync-plus-gitee";
 export const LEGACY_SECRET_GITHUB = "gitee-sync-plus-github";
+
+export type TokenHost = "gitee" | "github" | "gitlab";
 
 /**
  * Reads the list of secret IDs stored in Obsidian's keychain.
@@ -92,29 +94,38 @@ export class TokenManager {
 	}
 
 	/** Get the currently selected secret key for a host. */
-	getActiveKey(host: "gitee" | "github"): string {
-		return host === "gitee" ? this.plugin.settings.giteeTokenProfile : this.plugin.settings.githubTokenProfile;
+	getActiveKey(host: TokenHost): string {
+		const s = this.plugin.settings;
+		if (host === "gitee") return s.giteeTokenProfile;
+		if (host === "github") return s.githubTokenProfile;
+		return s.gitlabTokenProfile;
 	}
 
 	/** Set which secret key is active for a host. */
-	async setActiveKey(host: "gitee" | "github", key: string | null): Promise<void> {
+	async setActiveKey(host: TokenHost, key: string | null): Promise<void> {
+		const s = this.plugin.settings;
 		if (host === "gitee") {
-			this.plugin.settings.giteeTokenProfile = key ?? "";
+			s.giteeTokenProfile = key ?? "";
+		} else if (host === "github") {
+			s.githubTokenProfile = key ?? "";
 		} else {
-			this.plugin.settings.githubTokenProfile = key ?? "";
+			s.gitlabTokenProfile = key ?? "";
 		}
 		await this.refreshInMemoryToken(host);
 		await this.plugin.savePluginData();
 	}
 
 	/** Refresh the in-memory token from the active key. */
-	async refreshInMemoryToken(host: "gitee" | "github"): Promise<void> {
+	async refreshInMemoryToken(host: TokenHost): Promise<void> {
 		const key = this.getActiveKey(host);
 		const token = key ? await this.getToken(key) : null;
+		const s = this.plugin.settings;
 		if (host === "gitee") {
-			this.plugin.settings.giteeToken = token ?? "";
+			s.giteeToken = token ?? "";
+		} else if (host === "github") {
+			s.githubToken = token ?? "";
 		} else {
-			this.plugin.settings.githubToken = token ?? "";
+			s.gitlabToken = token ?? "";
 		}
 	}
 
@@ -124,6 +135,9 @@ export class TokenManager {
 	 * no active key is selected, the token is written under the legacy keychain
 	 * key and that key becomes the active selection.
 	 * @returns true if at least one token was migrated.
+	 *
+	 * GitLab never used a legacy secret (it shipped after this migration), so
+	 * only Gitee and GitHub are handled here.
 	 */
 	async migrateLegacyTokens(): Promise<boolean> {
 		const ss = this.ss;

@@ -1,11 +1,12 @@
 import { Notice, Platform, Plugin } from "obsidian";
-import { GitIgnoreManager } from "./gitignore";
-import { formatDateTime, formatTime, messages } from "./i18n";
-import { DEFAULT_SETTINGS, SyncSettings, SyncSettingTab } from "./settings";
-import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./GitPanelView";
-import { DIFF_VIEW_TYPE, DiffView, setDiffPluginInstance } from "./DiffView";
-import { LOG_FILE, SyncEngine, SyncSummary } from "./sync";
-import { TokenManager } from "./token-manager";
+import { GitIgnoreManager } from "./utils/gitignore";
+import { formatDateTime, formatTime, messages } from "./utils/i18n";
+import type { SyncSettings } from "./types/settings";
+import { DEFAULT_SETTINGS, SyncSettingTab } from "./settings/settings-tab";
+import { GIT_PANEL_VIEW_TYPE, GitPanelView } from "./ui/git-panel-view";
+import { DIFF_VIEW_TYPE, DiffView, setDiffPluginInstance } from "./ui/diff-view";
+import { LOG_FILE, SyncEngine, SyncSummary } from "./utils/engine";
+import { TokenManager } from "./utils/token-manager";
 
 interface HashCacheEntry {
 	mtime: number;
@@ -241,7 +242,11 @@ export default class CloudSyncPlugin extends Plugin {
 		const data = (await this.loadData()) as Partial<PluginData> | null;
 		this.settings = { ...DEFAULT_SETTINGS, ...data?.settings };
 		// Migrate configs that predate the removal of the Cloudflare Worker backend.
-		if (this.settings.backend !== "gitee" && this.settings.backend !== "github") {
+		if (
+			this.settings.backend !== "gitee" &&
+			this.settings.backend !== "github" &&
+			this.settings.backend !== "gitlab"
+		) {
 			this.settings.backend = "gitee";
 		}
 		this.syncState =
@@ -251,6 +256,7 @@ export default class CloudSyncPlugin extends Plugin {
 		// Refresh in-memory tokens from the currently selected keychain keys.
 		await this.tokenManager.refreshInMemoryToken("gitee");
 		await this.tokenManager.refreshInMemoryToken("github");
+		await this.tokenManager.refreshInMemoryToken("gitlab");
 	}
 
 	/**
@@ -268,6 +274,7 @@ export default class CloudSyncPlugin extends Plugin {
 			// vault sync cannot leak it. The in-memory value stays intact.
 			giteeToken: ss ? "" : this.settings.giteeToken,
 			githubToken: ss ? "" : this.settings.githubToken,
+			gitlabToken: ss ? "" : this.settings.gitlabToken,
 		};
 		const data: PluginData = { settings: persist, hashCache: this.hashCache };
 		await this.saveData(data);

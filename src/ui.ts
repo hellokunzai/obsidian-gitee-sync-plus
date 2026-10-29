@@ -1,5 +1,5 @@
 import { App, Modal, getIconIds, setIcon, setTooltip } from "obsidian";
-import { messages } from "./i18n";
+import { messages } from "./utils/i18n";
 
 /**
  * Lucide icon names vary between Obsidian releases, so every call site passes

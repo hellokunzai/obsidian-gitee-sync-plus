@@ -1,7 +1,8 @@
 import { Vault } from "obsidian";
-import { BatchDelete, BatchFileChange, createBackend, RemoteEntry, StorageBackend } from "./backend";
-import { formatDateTime, messages } from "./i18n";
-import type CloudSyncPlugin from "./main";
+import type { BatchDelete, BatchFileChange, RemoteEntry, StorageBackend } from "../types/backend";
+import { createBackend } from "../backends/index";
+import { formatDateTime, messages } from "../utils/i18n";
+import type CloudSyncPlugin from "../main";
 
 /** Diagnostic log note. Excluded from sync via .gitignore so it never travels between devices. */
 export const LOG_FILE = "_gitee-sync-plus-log.md";
@@ -671,7 +672,9 @@ export class SyncEngine {
 		const target =
 			s.backend === "github"
 				? `github ${s.githubOwner}/${s.githubRepo}@${s.githubBranch}`
-				: `gitee ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
+				: s.backend === "gitlab"
+					? `gitlab ${s.gitlabOwner}/${s.gitlabRepo}@${s.gitlabBranch}`
+					: `gitee ${s.giteeOwner}/${s.giteeRepo}@${s.giteeBranch}`;
 		const lines: string[] = [];
 		lines.push(`\n## ${title} ${formatDateTime()}`);
 		lines.push(
