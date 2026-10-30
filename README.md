@@ -1,131 +1,155 @@
 # Gitee Sync Plus
 
-[中文文档](./README.zh.md)
+> 一款为 Obsidian 打造的笔记同步插件：无需在电脑上安装 Git，直接把你的笔记仓库同步到 **Gitee / GitHub / GitLab / Gitea**。
 
-Sync your Obsidian vault to a private **Gitee or GitHub repository**. Gitee Sync Plus connects directly to the platform API — no server and no local Git installation required — and works on desktop, iOS, and Android.
+[English](README.en.md) · 简体中文
 
-## Features
+---
 
-- **Two-way incremental sync** between your vault and a private Git repository.
-- **Three-way merge** using Git blob hashes and a per-device baseline (local / remote / last successful sync), so deletions and conflicts are resolved correctly across devices.
-- **Conflict resolution** — when the same file changes on both sides, resolve each conflict by keeping local, using remote, or merging blocks; supports "apply to all".
-- **Git panel** — a right-side source-control style view showing staged / unstaged / remote changes, with commit, pull, discard, stage/unstage, and per-file diff.
-- **Diff viewer** — compare local and remote versions side by side or unified, revert individual change blocks, or mark a file as synced.
-- **Automatic sync** on a timer, on startup, or on demand (ribbon, status bar, command palette, Git panel).
-- **Dry-run preview** that writes the planned actions to a diagnostic note without touching either side.
-- **Secure token storage** in the Obsidian keychain (no plaintext in `data.json`), with multiple named tokens per backend.
-- **Per-file or batch commits**, and a configurable merge strategy (`mtime` / `remote` / `local`).
-- **Exclusion rules** via a `.gitignore` file at the vault root.
-- **Bilingual UI** that follows Obsidian's language (English / 中文).
+## ✨ 功能特性
 
-## How it works
+- **零本地 Git 依赖**：插件通过各平台的 REST API 直接读写仓库，不需要本机安装 Git、也不依赖 `git` 命令行。
+- **三向同步**：把「本地仓库 / 远端仓库 / 上次成功同步时的状态」三方比对，能区分「这边改了」还是「那边改了」，并支持**双向删除传播**（本地删了、远端也删；反之亦然）。
+- **多平台支持**：一套配置在 Gitee、GitHub、GitLab、Gitea 之间自由切换，切换后端后首次同步会做一次全量对账并保留较新的版本。
+- **冲突解决**：同一文件两端都改了，默认按「修改时间较新者」胜出；也可在弹窗里手动选择「保留本地 / 使用远端 / 合并」。
+- **差异对比（Diff）**：可视化查看文件改动，支持并排 / 纵向布局、折叠未变更片段、按区块还原、一键采纳本地或远端版本、标记为已同步。
+- **Git 面板**：类 IDE 的右侧边栏「源代码管理」视图 —— 列出本地 / 远端改动、暂存（Stage）、推送（Commit）、拉取（Pull）、放弃改动、查看差异。
+- **令牌安全存储**：访问令牌优先存入 Obsidian 钥匙串（SecretStorage），数据文件里不再保留明文；支持多套命名密钥（Profile）自由切换，并自动从旧版明文配置迁移。
+- **自动化与时机**：可设置「自动同步间隔（分钟）」「启动时同步」，也可随时手动触发。
+- **提交策略可配**：单独提交（每文件一条提交）或批量提交（所有变更合并为一次提交）；冲突合并策略可选「最新修改时间 / 全部远端 / 全部本地」。
+- **统一排除规则**：过滤逻辑全部收敛到 vault 根目录的 `.gitignore`，支持标准 gitignore 语法。
+- **双向国际化**：内置简体中文与英文界面。
 
-The sync engine computes a Git blob content hash for every file and performs a **three-way comparison** between the local vault, the remote repository, and the **per-device baseline** (the last successfully synced state, stored locally in the plugin's localStorage — never in `data.json`, so it stays device-specific).
+> 兼容移动端（`manifest` 已声明 `isDesktopOnly: false`）。注意：令牌钥匙串依赖 Obsidian 1.11.4+ 的 SecretStorage；低于该版本时令牌会作为兜底写入 `data.json`（仍以明文存储，请务必为仓库设置私有 + 排除日志）。
 
-- Local-only changes are uploaded; remote-only changes are downloaded.
-- Deletions propagate in both directions.
-- When the same file is modified on both sides, the **newer modification wins** (or the configured merge strategy decides).
-- Every uploaded or deleted file creates a repository commit, so previous versions remain recoverable through Git history.
-- If the remote platform returns a truncated file tree, sync stops to prevent accidental mass deletion.
+---
 
-The plugin interface automatically follows Obsidian's language and currently supports English and Chinese.
+## 📦 安装
 
-## Installation
+### 方式一：BRAT（推荐，方便跟进更新）
 
-In Obsidian, open **Settings → Community plugins → Browse**, search for **Gitee Sync Plus**, install it, and enable it.
+1. 安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件。
+2. 命令面板运行 `BRAT: Add a beta plugin`。
+3. 填入仓库地址：`hellokunzai/obsidian-gitee-sync-plus`。
+4. 启用 **Gitee Sync Plus** 即可。
 
-For local development builds:
+### 方式二：手动安装
 
-```bash
-npm install
-npm run build
+1. 到 [Releases](https://github.com/hellokunzai/obsidian-gitee-sync-plus/releases) 下载 `main.js`、`manifest.json`、`styles.css` 三个文件。
+2. 放入 `<你的 vault>/.obsidian/plugins/gitee-sync-plus/` 目录（没有就新建）。
+3. 在 Obsidian 设置 → 第三方插件中启用 **Gitee Sync Plus**。
 
-mkdir -p "<vault>/.obsidian/plugins/gitee-sync-plus"
-cp main.js manifest.json "<vault>/.obsidian/plugins/gitee-sync-plus/"
+---
+
+## ⚙️ 快速配置
+
+打开 **设置 → Gitee Sync Plus**：
+
+1. **存储后端**：选择 Gitee / GitHub / GitLab / Gitea。
+2. **访问令牌**：点击「选择密钥」从 Obsidian 钥匙串中选取（或「添加密钥…」新建一个命名密钥并粘贴令牌）；也可用「测试」按钮校验令牌是否可用。
+   - Gitee：设置 → 安全设置 → 私人令牌，勾选 `projects` 权限。
+   - GitHub：Settings → Developer settings → Personal access tokens，勾选 `repo` 权限。
+   - GitLab：Settings → Access Tokens，需要 `api`（或 `read_repository` + `write_repository`）权限。
+   - Gitea：Settings → Applications → Generate Token（或实例的访问令牌页），需要仓库读写权限。
+3. **用户名 / 组织** 与 **仓库名**：填写仓库所属者（URL 中的 owner）与仓库名，建议使用一个**专用的私有仓库**。
+4. **分支**：填好上方信息后点击「刷新分支」自动拉取，或手动填写（Gitee 默认 `master`，其余默认 `main`）。
+   - GitLab / Gitea 还需在「高级设置 / 对应字段」填写实例地址（托管版分别为 `https://gitlab.com`、`https://gitea.com`）。
+5. （可选）**同步设置**：开启「同步按钮」（左侧栏 ribbon 快速同步）、「启动时同步」、设置「自动同步间隔」。
+6. （可选）**高级**：开启「Git 面板按钮」、开启「调试日志」、按需调整「合并方式」「提交模式」。
+
+配置完成后，点击状态栏的同步状态、左侧 ribbon 的同步按钮，或命令面板的 **Sync now** 即可开始同步。
+
+---
+
+## 💻 命令与入口
+
+| 入口 | 说明 |
+| --- | --- |
+| 状态栏 | 显示同步状态，点击即触发一次同步 |
+| 左侧 ribbon 同步按钮 | 快速同步（可在设置中关闭） |
+| 左侧 ribbon Git 面板按钮 | 打开右侧 Git 面板（默认关闭） |
+| 命令面板：`Sync now` | 立即同步 |
+| 命令面板：`Preview sync plan` | 预览本次同步计划（不执行，结果写入诊断笔记） |
+| 命令面板：`Open Git panel` | 打开 Git 面板 |
+| 命令面板：`Reset sync state (current repository)` | 仅清空「当前仓库」的基线，下次同步当作全新目标全量上传（其他仓库基线保留） |
+
+---
+
+## 🗂️ Git 面板
+
+通过 ribbon 按钮或命令打开右侧 **Git 面板**，它像 IDE 的源代码管理侧栏一样工作：
+
+- **本地更改**：下次同步会被推送的文件。可单独「暂存」「查看差异」「放弃改动」，或「全部暂存 / 放弃全部」。
+- **远端更改**：下次同步会被拉取 / 在本地删除的文件。
+- **推送（Commit）**：把暂存的本地改动上传到远端；批量模式下可在顶部填写提交说明。
+- **拉取（Pull）**：下载远端改动（同步的第一阶段）。
+- **刷新**：重新计算本地 / 远端差异。
+- 点击任意文件可打开 **差异对比** 视图。
+
+---
+
+## 🔀 冲突解决
+
+当某个文件自上次同步以来**两端都发生了修改**，同步拉取时会弹出冲突解决窗口：
+
+1. 依次查看每个冲突文件，选择：
+   - **保留本地**：以本地版本为准；
+   - **使用远端**：以远端版本为准；
+   - **合并…**：进入合并编辑器，为每一个冲突区块选择一侧或「两者都保留」，结果可自由编辑后保存。
+2. 也可用「全部保留本地 / 全部使用远端」一键处理。
+3. 确认无误后点击 **Confirm pull** 完成拉取。
+
+> 非交互式同步（如按钮、启动、定时）会根据「合并方式」设置自动裁决，无需手动介入。
+
+差异对比视图内同样支持：并排 / 纵向布局切换、折叠未变更片段、按区块「还原 / 采纳本地 / 采纳远端」、「标记为已同步」（把该文件从本次待处理中移出，视为已一致）。
+
+---
+
+## 🚫 排除规则（.gitignore）
+
+所有过滤逻辑统一由 **vault 根目录的 `.gitignore`** 控制（标准 gitignore 语法）。
+在设置 → 排除目录 中编辑规则，失去焦点即保存，下次同步生效。
+
+建议至少把以下内容排除，避免把插件自身状态与日志在设备间传来传去：
+
+```gitignore
+# 插件诊断日志（已记录同步计划与结果，不应参与同步）
+_gitee-sync-plus-log.md
+
+# 其它不应同步的内容（示例）
+# .obsidian/
+# Templates/
 ```
 
-## Repository and token
+---
 
-**Gitee:** Create a private repository. In **Settings → Security Settings → Personal access tokens**, create a token with the **projects** permission.
+## 🔒 安全与隐私
 
-**GitHub:** Create a private repository. A fine-grained personal access token needs **Contents: Read and write** access to the repository; a classic token needs the `repo` scope.
+- **令牌存于钥匙串**：当运行环境支持时，访问令牌写入 Obsidian 钥匙串（`secretStorage`），`data.json` 中只保留密钥名、不保留明文值；打开设置页时会自动把旧版明文令牌迁移进钥匙串。
+- **日志默认排除**：诊断日志 `_gitee-sync-plus-log.md` 含同步明细，已在上述 `.gitignore` 示例中排除。
+- **私有仓库**：强烈建议使用一个**专用的私有仓库**存放笔记。
+- **多密钥**：可在钥匙串中维护多套命名密钥（例如区分个人 / 工作令牌），每个后端独立选择使用哪一套。
 
-Tokens are stored in the Obsidian Secret Storage (Settings → Secrets) when available, and are no longer written to `data.json`. You can manage multiple named tokens per backend and switch between them from the settings panel.
+---
 
-## Configuration
+## 🛠️ 故障排查
 
-| Setting | Description |
-|---|---|
-| Storage backend | Gitee repository or GitHub repository |
-| Owner | User or organization from the repository URL |
-| Repository | Private repository used for the vault |
-| Branch | Gitee defaults to `master`; GitHub defaults to `main`. The dropdown auto-populates from the API once owner/repo/token are filled. |
-| Token | Managed personal access tokens, stored in the Obsidian keychain. Click **Select token** to add or choose a saved token (with search and delete); click **Test** to verify it. |
-| Automatic sync interval | Minutes between syncs; `0` disables automatic sync |
-| Sync on startup | Runs one sync when Obsidian opens |
-| Commit mode | **One commit per file** (default) or **one commit for all changes (batch)** |
-| Merge strategy | How to resolve same-file conflicts during automatic/startup/scheduled sync: **Latest change time** (newer wins), **All remote**, or **All local** |
-| Sync button | When enabled, shows a sync button in the left sidebar ribbon |
-| Git panel button | When enabled, shows a Git panel button in the left sidebar ribbon |
-| Diagnostic log | Writes the sync plan and result to `_gitee-sync-plus-log.md` |
-| Excluded folders | Raw `.gitignore` rules at the vault root; edits take effect on the next sync |
+| 现象 | 排查方向 |
+| --- | --- |
+| GitLab 能「测试成功」但同步失败 | 仓库非空时，令牌可能只缺 `read_repository`/`api` 读取权限（`GET /projects/:id` 仅需 `read_api`，但同步读内容需要更高权限）。请为令牌勾选 `api`（或 `read_repository` + `write_repository`）。 |
+| GitLab 提示分支受保护 / 写不进去 | 目标分支受保护且当前令牌角色无权推送。用 Maintainer 角色重新生成令牌，或在项目 设置 → 仓库 → 受保护分支 中允许 Developers 推送。 |
+| 远端文件树被截断 | 远端文件过多导致清单被截断，插件会**中止同步以防误删**。请通过 `.gitignore` 缩小同步范围。 |
+| 只差换行符的文件被反复判定为变更 | 插件以 LF 归一化哈希比较内容，仅换行符差异会被忽略；若仍频繁触发，多为真实内容差异。 |
+| 调试日志没有产生 | 确认已在「高级」中开启「调试日志」，且日志文件未被 `.gitignore` 排除而无法落盘。 |
 
-Trigger sync from the ribbon icon, the **Sync now** command, the status bar, the timer, startup sync, or the Git panel. Use **Preview sync plan** to inspect planned actions without changing either side.
+---
 
-## Git panel
+## 🔗 与 Gitee Sync 的关系
 
-The Git panel is a right-sidebar view that mirrors a typical source-control sidebar, but runs on the plugin's three-way sync model (no local Git binary required). Open it with the **Open Git panel** command or the optional ribbon button.
+本插件由社区插件 **Gitee Sync** 派生而来，并重写了同步引擎：将所有过滤条件统一收敛至 `.gitignore` 机制，同时支持 Gitee 与 GitHub 双平台（并已扩展至 GitLab、Gitea），且不再依赖本机 Git。
 
-- **Staged / Changes / Remote** groups list every file the next sync will touch.
-- **Commit** pushes the staged local changes (with an optional commit message; in batch mode the message applies to the whole commit).
-- **Pull** downloads remote changes; if conflicts exist, a conflict-resolution modal appears first.
-- **Discard** reverts a local change to the last-synced remote version (or deletes a purely-local new file).
-- **View diff** opens the diff viewer for any changed file.
-- The panel auto-refreshes (debounced) when the vault changes and shows the current `owner/repo@branch` target.
+---
 
-## Conflict resolution
+## 📄 许可证
 
-When a file is modified on **both** sides since the last sync, a conflict is detected.
-
-- During a **Pull** from the Git panel, a modal lists every conflict. For each file you can **Keep local**, **Use remote**, or open the **Merge** editor to pick blocks (keep local / keep remote / keep both) and save the merged result. **Use remote for all** / **Keep local for all** resolve everything at once, then **Confirm pull** applies the choices.
-- During **automatic / startup / scheduled** sync (no interactive prompt), the configured **Merge strategy** decides: `mtime` keeps the newer version, `remote` always takes the remote copy, `local` always keeps the local copy.
-
-The diff viewer also lets you compare versions, revert individual change blocks, or mark a file as already-synced.
-
-## Commands
-
-| Command ID | Name | Description |
-|---|---|---|
-| `sync-now` | Sync now | Run a full two-way sync |
-| `sync-preview` | Preview sync plan | Compute the plan and write it to the diagnostic note without changes |
-| `open-git-panel` | Open Git panel | Open the right-sidebar Git panel |
-
-## Multiple devices
-
-Install and configure the plugin on every device with the same repository. Each device keeps its own sync baseline. A new device downloads the remote vault on its first sync and uses incremental sync afterwards.
-
-Mobile operating systems suspend timers in the background, so enabling **Sync on startup** is recommended.
-
-## iOS file visibility
-
-If a downloaded folder is visible but a file with a non-standard extension is not, open **Settings → Files and links** and enable **Detect all file extensions**. The file may already be present but hidden by Obsidian's file explorer.
-
-## Sync behavior
-
-- Local-only changes are uploaded; remote-only changes are downloaded.
-- Deletions propagate in both directions. Local deletions use Obsidian's trash, and remote history remains recoverable through Git.
-- If both sides modify the same file, the newer modification wins. A modification wins over a deletion.
-- Hidden paths such as `.obsidian` and `.git` are ignored on both sides.
-- Sync stops if the remote platform returns a truncated file tree, preventing accidental mass deletion.
-- Every uploaded or deleted file creates a repository commit, so previous versions remain recoverable.
-
-## Limitations and security
-
-- The first sync of a large vault creates one commit per file (per-file mode) and may be limited by platform API quotas.
-- Keep large attachments in an excluded folder. Individual files should preferably remain below 50 MB.
-- Tokens are stored in the Obsidian Secret Storage (Settings → Secrets), no longer in `data.json`. No need to exclude anything when backing up the vault with other tools. On mobile / older Obsidian versions without secret storage, the token falls back to `data.json`.
-- Do not manually push the same vault to the same repository while the plugin manages it.
-
-## Credits
-
-This project is based on the original Gitee Sync plugin by **ericquan8**. The original work is retained under the MIT license (see `LICENSE`). Thanks to ericquan8 for the foundational implementation that this plugin builds upon.
+[MIT](LICENSE)
