@@ -36,7 +36,7 @@ jobs:
           notes_file="release-notes.md"
           # 发布正文内联维护，避免依赖仓库外的文件
           cat > "$notes_file" <<'NOTES'
-          ## Gitee Sync Plus 1.3.4
+          ## Gitee Sync Plus 1.4.0
 
           ### ✨ 新增 / Added
           - **GitLab 平台支持**：新增 GitLab 后端，可同步到官方或自建 GitLab 仓库。
@@ -49,7 +49,7 @@ jobs:
           - README 中英双语重构（README.md 中文 / README.en.md 英文）。
 
           ### 🛠 修复 / Fixed
-          - 版本号对齐：package.json 升到 1.3.4，与 manifest / versions 一致。
+          - 版本号对齐：manifest / package.json / versions.json 统一为 1.4.0。
           - 安全：移除 innerHTML 直接赋值，改用 Obsidian 的 .empty() 清空下拉，消除 XSS 风险。
           - 样式：9 个自绘按钮提升 CSS 特异性并补充 height: auto，避免被默认样式覆盖。
           NOTES
