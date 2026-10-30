@@ -532,7 +532,7 @@ export class SyncSettingTab extends PluginSettingTab {
 			if (cached) {
 				// 先记录当前选择，再重新填充缓存分支
 				const currentVal = dropdownComponent.getValue() as string;
-				dropdownComponent.selectEl.innerHTML = "";
+				dropdownComponent.selectEl.empty();
 				for (const branch of cached) {
 					dropdownComponent.addOption(branch, branch);
 				}
